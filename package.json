@@ -1,7 +1,8 @@
 {
   "name": "soldered-micropython-helper",
   "displayName": "Soldered MicroPython Helper",
-  "description": "Flash MicroPython firmware to ESP boards using esptool.py",
+  "publisher": "solderedelectronics",
+  "description": "A MicroPython-focused helper for working with ESP-based boards directly inside Visual Studio Code.",
   "version": "0.1.0",
   "engines": {
     "vscode": "^1.100.0"
