@@ -10,7 +10,7 @@ A MicroPython-focused helper for working with ESP-based boards directly inside V
 
 - Flash firmware to boards
 - Upload and delete `.py` files
-- Live serial output monitoring (Thonny-style)
+- Live serial output monitoring
 - Fetch libraries and examples from Soldered's GitHub
 - Fully powered by `mpremote` and `esptool.py`
 
