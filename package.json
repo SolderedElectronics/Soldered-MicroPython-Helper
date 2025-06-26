@@ -1,0 +1,56 @@
+{
+  "name": "soldered-micropython-helper",
+  "displayName": "Soldered MicroPython Helper",
+  "description": "Flash MicroPython firmware to ESP boards using esptool.py",
+  "version": "0.1.0",
+  "engines": {
+    "vscode": "^1.100.0"
+  },
+  "main": "./dist/extension.js",
+  "scripts": {
+    "vscode:prepublish": "tsc -p ./"
+  },
+  "activationEvents": [],
+  "contributes": {
+    "commands": [
+      {
+        "command": "espFlasher.flashFirmware",
+        "title": "Flash Firmware (.bin)"
+      },
+      {
+        "command": "espFlasher.uploadPython",
+        "title": "Upload Python File"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "espFlasherView",
+          "title": "Soldered MicroPython Helper",
+          "icon": "resources/mp.svg"
+        }
+      ]
+    },
+    "views": {
+      "espFlasherView": [
+        {
+          "type": "webview",
+          "id": "espFlasherWebview",
+          "name": "",
+          "icon": "resources/mp.svg"
+        }
+      ]
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^18.19.112",
+    "@types/vscode": "^1.100.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^4.9.5"
+  },
+  "dependencies": {
+    "cheerio": "^1.1.0",
+    "fuse.js": "^7.1.0",
+    "serialport": "^13.0.0"
+  }
+}

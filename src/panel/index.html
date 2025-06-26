@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    /* Base styling for the webview body */
+    body {
+      font-family: var(--vscode-font-family);
+      font-size: 13px;
+      padding: 12px;
+      background-color: var(--vscode-sideBar-background);
+      color: var(--vscode-foreground);
+    }
+
+    /* Header styling for collapsible sections */
+    h4 {
+      font-size: 15px;
+      margin-bottom: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+    }
+
+    /* Reusable section container */
+    .section {
+      margin-bottom: 24px;
+    }
+
+    /* Basic label styling */
+    label {
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    /* Shared input and select element styling */
+    input, select {
+      width: 100%;
+      padding: 6px;
+      margin-bottom: 12px;
+      border-radius: 4px;
+      border: 1px solid var(--vscode-input-border);
+      background-color: var(--vscode-input-background);
+      color: var(--vscode-input-foreground);
+    }
+
+    /* Style for all buttons */
+    button {
+      display: block;
+      width: 100%;
+      padding: 10px 0;
+      margin-top: 10px;
+      margin-bottom: 10px;
+      background-color: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+      font-weight: bold;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    /* Button hover effect */
+    button:hover {
+      background-color: var(--vscode-button-hoverBackground);
+    }
+
+    /* Layout for horizontal button groups */
+    .buttons-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .buttons-row button {
+      flex: 1;
+      margin-top: 0;
+    }
+
+    /* Collapsible section animation and visibility control */
+    .section-content {
+      overflow: hidden;
+      max-height: 0;
+      opacity: 0;
+      transition: max-height 0.3s ease, opacity 0.3s ease, margin-top 0.3s ease;
+      margin-top: 0;
+    }
+
+    /* When a section is open, expand its content */
+    .toggleable.open > .section-content {
+      max-height: 1000px; /* Arbitrary large max-height to fit contents */
+      opacity: 1;
+      margin-top: 8px;
+    }
+
+    /* Rotate arrow icon when section is open */
+    .arrow {
+      display: inline-block;
+      margin-right: 8px;
+      transition: transform 0.2s ease-in-out;
+    }
+
+    .toggleable.open .arrow {
+      transform: rotate(90deg);
+    }
+
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--vscode-editorGroup-border);
+  padding-bottom: 10px;
+}
+
+.app-logo {
+  width: 32px;
+  height: 32px;
+  color: var(--vscode-foreground); /* Dynamically uses the current theme text color */
+  filter: invert(1);
+}
+
+.app-title {
+  font-size: 18px;
+  font-weight: bold;
+  margin: 0;
+  color: var(--vscode-foreground);
+}
+
+.intro-section {
+  max-width: 700px;
+  margin: 0 auto 2rem auto;
+  text-align: center;
+  line-height: 1.6;
+}
+
+.intro-text {
+  margin-top: 1rem;
+  font-size: 0.95rem;
+  color: var(--vscode-foreground);
+}
+
+.intro-text a {
+  color: var(--vscode-textLink-foreground);
+  text-decoration: none;
+}
+
+.intro-text a:hover {
+  text-decoration: underline;
+}
+
+
+
+  </style>
+</head>
+
+<body>
+
+<div class="app-header">
+  <img src="{{mpIconUri}}" alt="MP Icon" class="app-logo">
+  <h1 class="app-title">Soldered MicroPython Helper</h1>
+</div>
+
+<!-- Intro Section -->
+<div class="intro-section">
+  <p class="intro-text">
+    <strong>Soldered MicroPython Helper</strong> is a Visual Studio Code extension that helps you get started with your MicroPython projects using a friendly graphical interface.
+  </p>
+  <p class="intro-text">
+    <em>Note:</em> This extension is <strong>experimental</strong> and currently in version <strong>0.1.0</strong>. It acts as a graphical wrapper around <code>mpremote</code> commands, making them easier to use.
+  </p>
+  <p class="intro-text">
+    You can explore the full source code on GitHub, submit issues or pull requests, and leave feedback on the extension page in the VS Code Marketplace.
+  </p>
+</div>
+
+
+
+<!-- COM Port Dropdown (Shared) -->
+<!-- Label and dropdown menu to let user pick a serial port for flashing/uploading -->
+<label for="port">COM port Selection</label>
+<select id="port"></select>
+
+
+
+<!-- Flash Firmware Section -->
+<!-- Collapsible UI section for flashing MicroPython firmware -->
+<div class="section toggleable" id="flashSection">
+
+  <!-- Clickable header with arrow icon to toggle visibility of content -->
+  <h4 onclick="toggleSection('flashSection')">
+    <span class="arrow">▶</span> Install Micropython on your board
+  </h4>
+
+  <!-- Hidden content that slides open when section is expanded -->
+  <div class="section-content">
+
+    <!-- Text input to search for firmware builds on the MicroPython site -->
+    <label for="firmwareQuery">Search Firmware (e.g. esp32)</label>
+    <input type="text" id="firmwareQuery" placeholder="Type board name...">
+
+    <!-- Firmware select box populated with top matches based on search query -->
+    <label for="firmwareSelect">Top 5 Matches</label>
+    <select id="firmwareSelect" size="5"></select>
+
+    <!-- Button to download firmware from the web and flash it directly to the device -->
+    <button id="flashFromWebBtn">Download + Flash from Web</button>
+
+    <!-- Button to flash a local .bin file manually selected from the PC -->
+    <button id="flashLocalBtn">Flash .bin File from PC</button>
+
+  </div>
+</div>
+
+<!-- Upload & Manage Section -->
+<!-- Collapsible section for uploading Python files and managing them on the device -->
+<div class="section toggleable" id="uploadSection">
+
+  <!-- Clickable section header with arrow icon -->
+  <h4 onclick="toggleSection('uploadSection')">
+    <span class="arrow">▶</span> Upload & Manage Python Scripts
+  </h4>
+
+  <!-- Hidden content that expands when section is open -->
+  <div class="section-content">
+
+    <!-- Upload the currently active Python file in VS Code and rename it to main.py on the device -->
+    <button id="uploadPythonBtn">Upload Active Python File as main.py</button>
+
+    <!-- Upload the currently active Python file to the device without renaming -->
+    <button id="uploadAsIsBtn">Upload Active Python File</button>
+
+    <!-- Upload a Python file from the user's file system (no need for it to be open in the editor) -->
+    <button id="uploadFromPcBtn">Upload Python File from PC</button>
+
+    <!-- Buttons for listing or refreshing the list of files stored on the device -->
+    <div class="buttons-row">
+      <button id="listFilesBtn">List Files</button>
+      <button id="refreshBtn">Refresh Files</button>
+    </div>
+
+    <!-- Dropdown (multi-line) for selecting files on the device -->
+    <label for="fileSelect">Files on Device</label>
+    <select id="fileSelect" size="6" style="width: 100%;"></select>
+
+    <!-- Buttons for running or deleting the selected file from the list -->
+    <div class="buttons-row">
+      <button id="runFileBtn">Run Selected File</button>
+      <button id="serialMonitorBtn">Start Serial Monitor</button>
+      <button id="stopCodeBtn">Stop Code</button>
+      <button id="deleteFileBtn">Delete Selected File</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- Fetch Soldered Module Section -->
+<div class="section toggleable" id="solderedFetchSection">
+  <h4 onclick="toggleSection('solderedFetchSection')">
+    <span class="arrow">▶</span> Fetch Soldered MicroPython Module
+  </h4>
+  <div class="section-content">
+    <label for="moduleSearch">Search for a sensor/module (e.g. ltr, temp, acc)</label>
+    <input type="text" id="moduleSearch" placeholder="Type keyword..." />
+
+    <label for="moduleSelect">Matching Modules</label>
+    <select id="moduleSelect" size="6"></select>
+
+    <div class="buttons-row">
+      <button id="fetchLibraryBtn">Download Library</button>
+      <button id="fetchExamplesBtn">Download Examples</button>
+      <button id="fetchAllBtn">Download Both</button>
+    </div>
+  </div>
+</div>
+
+
+
+
+
+<script>
+
+// Gain access to the VS Code Webview API
+const vscode = acquireVsCodeApi();
+
+
+
+function saveToggleState() {
+  const state = {};
+  document.querySelectorAll('.toggleable').forEach(section => {
+    state[section.id] = section.classList.contains('open');
+  });
+  localStorage.setItem('toggleState', JSON.stringify(state));
+}
+
+function restoreToggleState() {
+  const state = JSON.parse(localStorage.getItem('toggleState') || '{}');
+  document.querySelectorAll('.toggleable').forEach(section => {
+    if (state[section.id]) {
+      section.classList.add('open');
+    } else {
+      section.classList.remove('open');
+    }
+  });
+}
+
+
+// Toggle visibility of a collapsible section by toggling the "open" class
+function toggleSection(id) {
+  const section = document.getElementById(id);
+  section.classList.toggle("open");
+  saveToggleState();
+}
+
+
+// === Init events ===
+window.addEventListener('load', () => {
+  // When the webview is first loaded, fetch firmware options based on current input
+  restoreToggleState();
+  const board = document.getElementById('firmwareQuery').value;
+  const port = document.getElementById('port').value;
+  vscode.postMessage({ command: 'getFirmwareOptions', board, port });
+});
+
+window.addEventListener('focus', () => {
+  vscode.postMessage({ command: 'requestRefresh' });
+});
+
+
+
+// Serial Monitor Button
+document.getElementById('serialMonitorBtn').addEventListener('click', () => {
+  const port = document.getElementById('port').value;
+  if (!port) return alert('Please select a COM port.');
+  vscode.postMessage({ command: 'startSerialMonitor', port });
+});
+
+document.getElementById('stopCodeBtn').addEventListener('click', () => {
+  const port = document.getElementById('port').value;
+  if (!port) return alert('Please select a COM port.');
+  vscode.postMessage({ command: 'stopRunningCode', port });
+});
+
+
+
+
+
+// Update firmware options as the user types in the search input
+document.getElementById('firmwareQuery').addEventListener('input', (e) => {
+  const board = e.target.value;
+  const port = document.getElementById('port').value;
+  vscode.postMessage({ command: 'getFirmwareOptions', board, port });
+});
+
+// === Flash from Web ===
+document.getElementById('flashFromWebBtn').addEventListener('click', () => {
+  // Get selected firmware URL and COM port
+  const firmwareUrl = document.getElementById('firmwareSelect').value;
+  const port = document.getElementById('port').value;
+
+  // Validate inputs before proceeding
+  if (!firmwareUrl || !port) {
+    alert('Please select firmware and port before flashing.');
+    return;
+  }
+
+  // Ask the extension to download the firmware and flash it using esptool
+  vscode.postMessage({
+    command: 'flashFromWeb',
+    firmwareUrl,
+    port
+  });
+});
+
+// === Message listener ===
+window.addEventListener('message', (event) => {
+  const message = event.data;
+
+  // Populate firmware select box with search results
+  if (message.command === 'setFirmwareOptions') {
+    const select = document.getElementById('firmwareSelect');
+    select.innerHTML = ''; // Clear previous options
+
+    // Create an <option> for each firmware item
+    message.options.forEach(opt => {
+      const option = document.createElement('option');
+      option.value = opt.url;
+      option.textContent = opt.name;
+      select.appendChild(option);
+    });
+  }
+
+  // Populate the COM port dropdown
+  if (message.command === 'populatePorts') {
+    const select = document.getElementById('port');
+    select.innerHTML = ''; // Clear previous ports
+
+    message.ports.forEach(port => {
+      const option = document.createElement('option');
+      option.value = port;
+      option.textContent = port;
+      select.appendChild(option);
+    });
+  }
+
+  // Show a list of files currently on the device
+  if (message.command === 'displayFiles') {
+    const fileSelect = document.getElementById('fileSelect');
+    fileSelect.innerHTML = ''; // Clear list
+
+    // Save file list into local state
+    currentState.files = message.files;
+
+    message.files.forEach(file => {
+      const option = document.createElement('option');
+      option.value = file;
+      option.textContent = file;
+      fileSelect.appendChild(option);
+    });
+
+    saveState(); // Persist to VS Code state
+  }
+
+  // Request a file listing from the device
+  if (message.command === 'triggerListFiles') {
+    vscode.postMessage({ command: 'listFiles', port: message.port });
+  }
+});
+
+
+// Flash a local .bin file using a file picker
+document.getElementById('flashLocalBtn').addEventListener('click', () => {
+  const port = document.getElementById('port').value;
+  if (!port) return alert('Please select the COM Port before flashing.');
+  vscode.postMessage({ command: 'flashFirmware', port });
+});
+
+// Upload active editor file as main.py
+document.getElementById('uploadPythonBtn').addEventListener('click', () => {
+  const port = document.getElementById('port').value;
+  if (!port) return alert('Please select the COM Port before uploading.');
+  vscode.postMessage({ command: 'uploadPython', port });
+});
+
+// Upload active editor file with original filename
+document.getElementById('uploadAsIsBtn').addEventListener('click', () => {
+  const port = document.getElementById('port').value;
+  if (!port) return alert('Please select the COM Port before uploading.');
+  vscode.postMessage({ command: 'uploadPythonAsIs', port });
+});
+
+// Request list of files on the device
+document.getElementById('listFilesBtn').addEventListener('click', () => {
+  const port = document.getElementById('port').value;
+  if (!port) return alert('Please select the COM Port before listing files.');
+  vscode.postMessage({ command: 'listFiles', port });
+});
+
+// Same as above but named "refresh"
+document.getElementById('refreshBtn').addEventListener('click', () => {
+  const port = document.getElementById('port').value;
+  if (!port) return alert('Please select the COM Port before refreshing files.');
+  vscode.postMessage({ command: 'listFiles', port });
+});
+
+// Delete the selected file from the device
+document.getElementById('deleteFileBtn').addEventListener('click', () => {
+  const port = document.getElementById('port').value;
+  const filename = document.getElementById('fileSelect').value;
+  if (!port) return alert('Please select the COM Port before deleting a file.');
+  if (!filename) return alert('No file selected to delete.');
+  vscode.postMessage({ command: 'deleteFile', port, filename });
+});
+
+// Run the selected Python file from the device
+document.getElementById('runFileBtn').addEventListener('click', () => {
+  const port = document.getElementById('port').value;
+  const filename = document.getElementById('fileSelect').value;
+  if (!port) return alert('Please select the COM Port before running a file.');
+  if (!filename) return alert('No file selected to run.');
+  vscode.postMessage({ command: 'runPythonFile', port, filename });
+});
+
+// Double-click on a file to open it in VS Code editor
+document.getElementById('fileSelect').addEventListener('dblclick', () => {
+  const port = document.getElementById('port').value;
+  const filename = document.getElementById('fileSelect').value;
+
+  if (!port || !filename) {
+    alert('Please select a COM port and a file to open.');
+    return;
+  }
+
+  // Ask extension to download the file to temp and open it
+  vscode.postMessage({ command: 'openFileFromDevice', port, filename });
+});
+
+// Upload a .py file from user's computer to the device
+document.getElementById('uploadFromPcBtn').addEventListener('click', () => {
+  const port = document.getElementById('port').value;
+  if (!port) return alert('Please select the COM Port before uploading.');
+  vscode.postMessage({ command: 'uploadPythonFromPc', port });
+});
+
+
+// Foundations for saving info
+
+
+// Holds current state of key UI elements so it can be restored on reload
+let currentState = {
+  port: '',
+  firmwareQuery: '',
+  selectedFirmware: '',
+  files: []
+};
+
+// Save current state into VS Code's persistent Webview state
+function saveState() {
+  vscode.setState(currentState);
+}
+
+// Restore state on reload or when switching back to the webview tab
+function restoreState() {
+  const state = vscode.getState();
+  if (state) {
+    currentState = state;
+
+    // Restore previously selected COM port and firmware query input
+    document.getElementById('port').value = currentState.port || '';
+    document.getElementById('firmwareQuery').value = currentState.firmwareQuery || '';
+
+    // Restore selected firmware item if still in the dropdown
+    if (currentState.selectedFirmware) {
+      const select = document.getElementById('firmwareSelect');
+      Array.from(select.options).forEach(opt => {
+        if (opt.value === currentState.selectedFirmware) opt.selected = true;
+      });
+    }
+
+    // Restore file list
+    const fileSelect = document.getElementById('fileSelect');
+    fileSelect.innerHTML = '';
+    currentState.files.forEach(file => {
+      const option = document.createElement('option');
+      option.value = file;
+      option.textContent = file;
+      fileSelect.appendChild(option);
+    });
+  }
+
+  // Always ask backend to refresh available ports just in case
+  vscode.postMessage({ command: 'getPorts' });
+}
+
+// Re-apply state when the panel becomes visible again (after tab switch)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    restoreState();
+    restoreToggleState();
+  }
+});
+
+// Track COM port selection changes and update state
+document.getElementById('port').addEventListener('change', e => {
+  currentState.port = e.target.value;
+  saveState();
+});
+
+// Track changes in the firmware search input and update state
+document.getElementById('firmwareQuery').addEventListener('input', e => {
+  currentState.firmwareQuery = e.target.value;
+  saveState();
+});
+
+// Track selected firmware option and update state
+document.getElementById('firmwareSelect').addEventListener('change', e => {
+  currentState.selectedFirmware = e.target.value;
+  saveState();
+});
+
+
+
+
+// === Soldered Module Fetching ===
+
+const moduleSearchInput = document.getElementById('moduleSearch');
+const moduleSelect = document.getElementById('moduleSelect');
+const portSelect = document.getElementById('port');
+
+if (moduleSearchInput && moduleSelect) {
+  moduleSearchInput.addEventListener('input', (e) => {
+    const keyword = e.target.value.trim();
+    if (keyword.length >= 1) {
+      vscode.postMessage({ command: 'searchModules', keyword });
+    } else {
+      moduleSelect.innerHTML = ''; // Clear dropdown if empty input
+    }
+  });
+}
+
+const fetchModule = (mode) => {
+  const sensor = moduleSelect?.value;
+  const port = portSelect?.value;
+  if (!sensor || !port) return alert('Select a module and port first.');
+  vscode.postMessage({ command: 'fetchModule', sensor, port, mode });
+};
+
+document.getElementById('fetchLibraryBtn')?.addEventListener('click', () => fetchModule('library'));
+document.getElementById('fetchExamplesBtn')?.addEventListener('click', () => fetchModule('examples'));
+document.getElementById('fetchAllBtn')?.addEventListener('click', () => fetchModule('all'));
+
+// Handle list of matches from backend
+window.addEventListener('message', event => {
+  const message = event.data;
+
+  if (message.command === 'setModuleMatches' && Array.isArray(message.matches)) {
+    moduleSelect.innerHTML = '';
+    
+    message.matches.forEach(match => {
+      const option = document.createElement('option');
+      option.value = match;
+      option.textContent = match;
+      moduleSelect.appendChild(option);
+    });
+
+    // Auto-select first result if available
+    if (message.matches.length > 0) {
+      moduleSelect.value = message.matches[0];
+    }
+  }
+});
+
+
+
+
+
+</script>
+</body>
+</html>

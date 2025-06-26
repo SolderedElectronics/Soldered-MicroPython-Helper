@@ -1,0 +1,55 @@
+# === Node.js / VS Code Extension ===
+
+# Dependencies
+node_modules/
+
+# Output files
+dist/
+out/
+*.vsix
+
+# VS Code IDE settings
+.vscode/
+
+# Logs and metadata
+*.log
+npm-debug.log*
+*.tsbuildinfo
+
+# === Python (esptool, scripts, helpers) ===
+
+# Bytecode / cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Tools
+pip-log.txt
+pip-delete-this-directory.txt
+
+# === OS-specific ===
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# === Other ===
+
+# Temp files
+*.tmp
+*.bak
+*.swp
+*~
+
+# Ignore firmware blobs if any
+*.bin
+*.hex
