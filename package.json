@@ -7,6 +7,7 @@
   "engines": {
     "vscode": "^1.100.0"
   },
+  "icon": "mp.png", 
   "main": "./dist/extension.js",
   "scripts": {
     "vscode:prepublish": "tsc -p ./"
