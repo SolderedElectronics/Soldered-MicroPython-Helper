@@ -3,7 +3,7 @@
   "displayName": "Soldered MicroPython Helper",
   "publisher": "solderedelectronics",
   "description": "A MicroPython-focused helper for working with ESP-based boards directly inside Visual Studio Code.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "engines": {
     "vscode": "^1.100.0"
   },

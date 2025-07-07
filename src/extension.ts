@@ -767,13 +767,34 @@ else if (message.command === 'stopRunningCode') {
       vscode.window.showErrorMessage('Module name and port are required.');
       return;
     }
-  
-    const baseUrl = `https://api.github.com/repos/SolderedElectronics/Soldered-MicroPython-Modules/contents/Sensors/${sensor}/${sensor}`;
+
+    const categories = ['Sensors', 'Displays', 'Actuators']; // Add more as needed
+    let baseUrl: string | undefined;
+
+    // Try to detect the correct category by probing GitHub
+    for (const category of categories) {
+      const testUrl = `https://api.github.com/repos/SolderedElectronics/Soldered-MicroPython-Modules/contents/${category}/${sensor}/${sensor}`;
+
+      const res: any = await new Promise((resolve) => {
+        https.get(testUrl, { headers: { 'User-Agent': 'vscode-extension' } }, resolve)
+          .on('error', () => resolve(undefined));
+      });
+
+      if (res?.statusCode === 200) {
+        baseUrl = testUrl;
+        break;
+      }
+    }
+
+    if (!baseUrl) {
+      vscode.window.showErrorMessage(`❌ Could not find module "${sensor}" in any known category.`);
+      return;
+    }
+
     const targets: string[] = [];
-  
     if (mode === 'library' || mode === 'all') targets.push(baseUrl);
     if (mode === 'examples' || mode === 'all') targets.push(`${baseUrl}/Examples`);
-  
+
     for (const url of targets) {
       await new Promise<void>((resolve) => {
         https.get(url, { headers: { 'User-Agent': 'vscode-extension' } }, res => {
@@ -783,22 +804,22 @@ else if (message.command === 'stopRunningCode') {
             try {
               const files = JSON.parse(data);
               const pyFiles = files.filter((f: any) => f.name.endsWith('.py'));
-            
+
               if (pyFiles.length === 0) {
                 vscode.window.showWarningMessage(`No .py files found in ${url}`);
                 return resolve();
               }
-            
+
               for (const file of pyFiles) {
                 const uploadName = file.name.replace(/-/g, '_'); // Normalize filename
                 const tempPath = path.join(os.tmpdir(), uploadName);
                 await this.downloadFile(file.download_url, tempPath);
-              
+
                 const uploadCmd = `mpremote connect ${port} fs cp "${tempPath}" :"${uploadName}"`;
                 this.outputChannel.appendLine(`⬆ Uploading ${uploadName}`);
                 await execCommand(uploadCmd);
               }
-            
+
               resolve();
             } catch (err) {
               vscode.window.showErrorMessage(`Failed to process ${url}`);
@@ -812,43 +833,59 @@ else if (message.command === 'stopRunningCode') {
         });
       });
     }
-  
+
     vscode.window.showInformationMessage(`✅ Downloaded ${mode} files for "${sensor}"`);
     this._view?.webview.postMessage({ command: 'triggerListFiles', port });
   }
 
 
 
+
   else if (message.command === 'searchModules') {
     const keyword = message.keyword || '';
-    const apiUrl = `https://api.github.com/repos/SolderedElectronics/Soldered-MicroPython-Modules/contents/Sensors`;
+    const categories = ['Sensors', 'Displays', 'Actuators'];  // Update as needed
 
-    https.get(apiUrl, { headers: { 'User-Agent': 'vscode-extension' } }, res => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        try {
-          const folders = JSON.parse(data).filter((f: any) => f.type === 'dir').map((f: any) => f.name);
-          const fuse = new Fuse(folders, {
-            threshold: 0.4,
-            ignoreLocation: true,
-            isCaseSensitive: false,
+    const allModules: string[] = [];
+
+    await Promise.all(categories.map(category => {
+      const apiUrl = `https://api.github.com/repos/SolderedElectronics/Soldered-MicroPython-Modules/contents/${category}`;
+
+      return new Promise<void>((resolve) => {
+        https.get(apiUrl, { headers: { 'User-Agent': 'vscode-extension' } }, res => {
+          let data = '';
+          res.on('data', chunk => data += chunk);
+          res.on('end', () => {
+            try {
+              const folders = JSON.parse(data)
+                .filter((f: any) => f.type === 'dir')
+                .map((f: any) => f.name);
+              allModules.push(...folders);
+            } catch (err) {
+              vscode.window.showErrorMessage(`Failed to parse module list for ${category}.`);
+            }
+            resolve();
           });
-
-          const matches = fuse.search(keyword).slice(0, 15).map(m => m.item);
-
-          this._view?.webview.postMessage({
-            command: 'setModuleMatches',
-            matches
-          });
-        } catch (err) {
-          vscode.window.showErrorMessage('Failed to parse module list from GitHub.');
-        }
+        }).on('error', err => {
+          vscode.window.showErrorMessage(`GitHub API error for ${category}: ${err.message}`);
+          resolve();
+        });
       });
-    }).on('error', err => {
-      vscode.window.showErrorMessage(`GitHub API error: ${err.message}`);
+    }));
+
+    const fuse = new Fuse(allModules, {
+      threshold: 0.4,
+      ignoreLocation: true,
+      isCaseSensitive: false,
+    });
+
+    const matches = fuse.search(keyword).slice(0, 15).map(m => m.item);
+
+    this._view?.webview.postMessage({
+      command: 'setModuleMatches',
+      matches
     });
   }
+
 
 
   // Handle deleting a file from the device using os.remove()
