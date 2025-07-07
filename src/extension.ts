@@ -104,16 +104,24 @@ private async handleFlashFromWeb(firmwareUrl: string, port: string) {
           if (err) {
             vscode.window.showErrorMessage(`Flash failed: ${stderr || err.message}`);
             reject(err);
+            this._view?.webview.postMessage({
+              command: 'flashStatusUpdate',
+              text: 'error'
+            });
           } else {
             vscode.window.showInformationMessage('Flash successful!');
             resolve();
-
-            // Ask frontend to re-list files (in case the new firmware changes them)
+            this._view?.webview.postMessage({
+              command: 'flashStatusUpdate',
+              text: 'done'
+            });
+          
             this._view?.webview.postMessage({ command: 'triggerListFiles', port });
           }
-        });
-      })
-  );
+
+                  });
+                })
+            );
 }
 
 /**
@@ -387,6 +395,12 @@ async resolveWebviewView(webviewView: vscode.WebviewView): Promise<void> {
       },
       () =>
         new Promise<void>((resolve, reject) => {
+          // Notify frontend that flashing is starting
+          this._view?.webview.postMessage({
+            command: 'uploadStatusUpdate',
+            text: 'start'
+          });
+        
           // Run the flashing command
           exec(cmd, (error, stdout, stderr) => {
             console.log('Command:', cmd);
@@ -395,14 +409,27 @@ async resolveWebviewView(webviewView: vscode.WebviewView): Promise<void> {
           
             if (error) {
               vscode.window.showErrorMessage(`Firmware flashing failed: ${stderr || error.message}`);
+            
+              this._view?.webview.postMessage({
+                command: 'uploadStatusUpdate',
+                text: 'error'
+              });
+            
               reject(error);
             } else {
               vscode.window.showInformationMessage('Firmware flashed successfully!');
+            
+              this._view?.webview.postMessage({
+                command: 'uploadStatusUpdate',
+                text: 'done'
+              });
+            
               resolve();
             }
           });
         })
     );
+
   }
 
   else if (message.command === 'requestRefresh') {
@@ -519,6 +546,12 @@ async resolveWebviewView(webviewView: vscode.WebviewView): Promise<void> {
 
     // Download the firmware and flash it using esptool
     await this.handleFlashFromWeb(firmwareUrl, port);
+
+    this._view?.webview.postMessage({
+      command: 'flashStatusUpdate',
+      text: 'start'
+    });
+
   }
 
   // Handle opening a file that exists on the device and showing it in the VS Code editor

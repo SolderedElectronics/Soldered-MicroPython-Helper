@@ -106,30 +106,51 @@ After completing the above, your VS Code extension should be able to access seri
 
 ---
 
+## 🧪 For Developers
+
+If you'd like to contribute or modify this extension locally, follow these steps:
+
+### 1. Install dependencies
+Make sure you have [Node.js](https://nodejs.org/), `npm`, and [Python 3.x](https://www.python.org/) installed.
+
+```bash
+npm install
+pip install esptool mpremote
+```
+
+### 2. Build the extension
+```bash
+npm run vscode:prepublish
+```
+
+### 3. Launch in VS Code
+
+- Open the project folder in VS Code.
+- Press `F5` to open a new Extension Development Host window.
+- The extension will load there and can be tested as if it were installed.
+
+---
+
 ## About Soldered
 
-Soldered Electronics is a European-based company designing and manufacturing **open-source hardware** for makers, hobbyists, educators, and professionals.
+<img src="https://raw.githubusercontent.com/e-radionicacom/Soldered-Generic-Arduino-Library/dev/extras/Soldered-logo-color.png" alt="soldered-logo" width="500"/>
 
-We specialize in:
-- Electronic boards, sensors, and actuators
-- Projects in microelectronics, robotics, mechatronics, and IoT
-- Supporting users with [📚 tutorials, code, and schematics](https://soldered.com/documentation/)
+At Soldered, we design and manufacture a wide selection of electronic products to help you turn your ideas into acts and bring you one step closer to your final project. Our products are intented for makers and crafted in-house by our experienced team in Osijek, Croatia. We believe that sharing is a crucial element for improvement and innovation, and we work hard to stay connected with all our makers regardless of their skill or experience level. Therefore, all our products are open-source. Finally, we always have your back. If you face any problem concerning either your shopping experience or your electronics project, our team will help you deal with it, offering efficient customer service and cost-free technical support anytime. Some of those might be useful for you:
 
----
+- [Web Store](https://www.soldered.com/shop)
+- [Tutorials & Projects](https://soldered.com/learn)
+- [Community & Technical support](https://soldered.com/community)
 
-## At a Glance
+### Original source
+​
+This library is possible thanks to original [Arduino_APDS9960](https://github.com/arduino-libraries/Arduino_APDS9960) library. Thank you, Arduino.
 
-- 🇭🇷 Based in Osijek, Croatia  
-- 🛠️ 200+ in-house designed products  
-- 🚚 225,000+ units delivered to 80+ countries  
-- 🌍 Open-source, high-quality, and community-driven  
-- ⭐ 4.8 average review score on TrustPilot
-- 💬 [24/7 technical support](https://soldered.com/contact/)
+### Open-source license
 
----
+Soldered invests vast amounts of time into hardware & software for these products, which are all open-source. Please support future development by buying one of our products.
+
+Check license details in the LICENSE file. Long story short, use these open-source files for any purpose you want to, as long as you apply the same open-source licence to it and disclose the original source. No warranty - all designs in this repository are distributed in the hope that they will be useful, but without any warranty. They are provided "AS IS", therefore without warranty of any kind, either expressed or implied. The entire quality and performance of what you do with the contents of this repository are your responsibility. In no event, Soldered (TAVU) will be liable for your damages, losses, including any general, special, incidental or consequential damage arising out of the use or inability to use the contents of this repository.
 
 ## Have fun!
 
-Thank you for your support from your fellow makers at Soldered Electronics.
-
-Happy Making!
+And thank you from your fellow makers at Soldered Electronics.

@@ -147,6 +147,23 @@
   text-decoration: underline;
 }
 
+.dot-flash {
+  animation: flashDots 1.2s infinite steps(1);
+  opacity: 0.2;
+  margin-left: 1px;
+}
+
+.dot-flash:nth-child(1) { animation-delay: 0s; }
+.dot-flash:nth-child(2) { animation-delay: 0.2s; }
+.dot-flash:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes flashDots {
+  0%   { opacity: 0.2; }
+  50%  { opacity: 1; }
+  100% { opacity: 0.2; }
+}
+
+
 
 
   </style>
@@ -221,13 +238,33 @@
     <label for="firmwareSelect">Top 5 Matches</label>
     <select id="firmwareSelect" size="5"></select>
 
-    <!-- Button to download firmware from the web and flash it directly to the device -->
-    <button id="flashFromWebBtn">Download + Flash from Web</button>
+    <!-- Flash From Web button with animated dots -->
+    <button id="flashFromWebBtn">
+      <span id="flashBtnText">Download + Flash from Web</span>
+      <span id="flashBtnSpinner" style="display: none;">
+        &nbsp;<span class="dot-flash">.</span><span class="dot-flash">.</span><span class="dot-flash">.</span>
+      </span>
+    </button>
 
-    <!-- Button to flash a local .bin file manually selected from the PC -->
-    <button id="flashLocalBtn">Flash .bin File from PC</button>
+    <button id="flashLocalBtn">
+      <span id="uploadBtnText">Upload Binary File from PC</span>
+      <span id="uploadBtnSpinner" style="display: none;">
+        &nbsp;<span class="dot-flash">.</span><span class="dot-flash">.</span><span class="dot-flash">.</span>
+      </span>
+    </button>
 
-    <p>Installation may take a minute, you only have to do it once for your board</p>
+
+    <!-- Visual feedback placeholder -->
+
+    <p style="
+      margin-top: 10px;
+      font-size: 0.95rem;
+      font-style: italic;
+      color: var(--vscode-descriptionForeground);
+    ">
+      Installation may take up to a minute. You only need to do it once per board.
+    </p>
+
 
   </div>
 </div>
@@ -441,11 +478,21 @@ window.addEventListener('message', (event) => {
     saveState(); // Persist to VS Code state
   }
 
+  if (message.command === 'flashStatusUpdate') {
+    const state = message.text;
+    setFlashingState(state);
+  }
+
+  if (message.command === 'uploadStatusUpdate') {
+    const state = message.text;
+    setUploadState(state);
+  }
+
   // Request a file listing from the device
   if (message.command === 'triggerListFiles') {
-    vscode.postMessage({ command: 'listFiles', port: message.port });
-  }
-});
+      vscode.postMessage({ command: 'listFiles', port: message.port });
+    }
+  });
 
 
 // Flash a local .bin file using a file picker
@@ -521,6 +568,8 @@ document.getElementById('uploadFromPcBtn').addEventListener('click', () => {
   if (!port) return alert('Please select the COM Port before uploading.');
   vscode.postMessage({ command: 'uploadPythonFromPc', port });
 });
+
+
 
 
 // Foundations for saving info
@@ -650,6 +699,59 @@ window.addEventListener('message', event => {
   }
 });
 
+
+function setUploadState(state) {
+  const btn = document.getElementById('flashLocalBtn');
+  const btnText = document.getElementById('uploadBtnText');
+  const spinner = document.getElementById('uploadBtnSpinner');
+
+  if (state === 'start') {
+    btn.disabled = true;
+    btnText.textContent = 'Flashing';
+    spinner.style.display = 'inline';
+  } else if (state === 'done') {
+    btnText.textContent = 'Success!';
+    spinner.style.display = 'none';
+    setTimeout(() => {
+      btn.disabled = false;
+      btnText.textContent = 'Upload Binary File from PC';
+    }, 1500);
+  } else if (state === 'error') {
+    btnText.textContent = 'Failed!';
+    spinner.style.display = 'none';
+    setTimeout(() => {
+      btn.disabled = false;
+      btnText.textContent = 'Upload Binary File from PC';
+    }, 1500);
+  }
+}
+
+
+function setFlashingState(state) {
+  const btn = document.getElementById('flashFromWebBtn');
+  const btnText = document.getElementById('flashBtnText');
+  const spinner = document.getElementById('flashBtnSpinner');
+
+  if (state === 'start') {
+    btn.disabled = true;
+    btnText.textContent = 'Flashing';
+    spinner.style.display = 'inline';
+  } else if (state === 'done') {
+    btnText.textContent = 'Success!';
+    spinner.style.display = 'none';
+    setTimeout(() => {
+      btn.disabled = false;
+      btnText.textContent = 'Download + Flash from Web';
+    }, 1500);
+  } else if (state === 'error') {
+    btnText.textContent = 'Failed!';
+    spinner.style.display = 'none';
+    setTimeout(() => {
+      btn.disabled = false;
+      btnText.textContent = 'Download + Flash from Web';
+    }, 1500);
+  }
+}
 
 
 
