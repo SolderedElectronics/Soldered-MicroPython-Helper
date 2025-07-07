@@ -285,8 +285,6 @@ private stopSerialMonitorAndReset(portPath: string) {
   });
 }
 
-
-
 private async refreshState() {
   const ports = await SerialPort.list();
 
