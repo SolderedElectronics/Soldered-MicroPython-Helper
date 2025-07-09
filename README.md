@@ -90,6 +90,39 @@ npm install serialport
 
 ---
 
+## ⚠️ Warning: Avoid Infinite Loops Without Delay
+
+When writing MicroPython code — especially when using `while True` loops — it's **critical to include a `sleep()` or other delay inside the loop**. This is standard practice to avoid common issues such as:
+
+- **CPU overload** — the loop runs thousands of times per second without pause
+- **Unreadable output** — serial prints become too fast to read
+- **Poor device responsiveness** — the device may become unresponsive or glitchy
+- **Unnecessary power consumption**
+
+### ✅ Recommended pattern:
+
+```python
+from time import sleep
+
+while True:
+    sleep(0.5)  # Add delay between iterations
+    print("Doing something...")
+```
+
+Here's a real-world example from APDS9960 gesture detection:
+
+```python
+while True:
+    sleep(0.5)
+    if apds.isGestureAvailable():
+        motion = apds.readGesture()
+        print("Gesture={}".format(dirs.get(motion, "unknown")))
+```
+
+🧠 **Tip**: You can adjust the delay based on sensor type or application needs — just make sure *some* delay is present in every infinite loop.
+
+---
+
 ## 🛠 Other Notes
 
 - On Linux/macOS, you may need to add your user to the `dialout` or `uucp` group:
