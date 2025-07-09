@@ -147,6 +147,23 @@
   text-decoration: underline;
 }
 
+.dot-flash {
+  animation: flashDots 1.2s infinite steps(1);
+  opacity: 0.2;
+  margin-left: 1px;
+}
+
+.dot-flash:nth-child(1) { animation-delay: 0s; }
+.dot-flash:nth-child(2) { animation-delay: 0.2s; }
+.dot-flash:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes flashDots {
+  0%   { opacity: 0.2; }
+  50%  { opacity: 1; }
+  100% { opacity: 0.2; }
+}
+
+
 
 
   </style>
@@ -159,19 +176,39 @@
   <h1 class="app-title">Soldered MicroPython Helper</h1>
 </div>
 
-<!-- Intro Section -->
-<div class="intro-section">
-  <p class="intro-text">
-    <strong>Soldered MicroPython Helper</strong> is a Visual Studio Code extension that helps you get started with your MicroPython projects using a friendly graphical interface.
-  </p>
-  <p class="intro-text">
-    <em>Note:</em> This extension is <strong>experimental</strong> and currently in version <strong>0.1.0</strong>. It acts as a graphical wrapper around <code>mpremote</code> commands, making them easier to use.
-  </p>
-  <p class="intro-text">
-    You can explore the full source code on GitHub, submit issues or pull requests, and leave feedback on the extension page in the VS Code Marketplace.
-  </p>
-</div>
+<!-- Info & Instructions Section (includes intro + features) -->
+<div class="section toggleable open" id="infoSection">
+  <h4 onclick="toggleSection('infoSection')">
+    <span class="arrow">▶</span> Info & Instructions
+  </h4>
+  <div class="section-content">
 
+    <!-- Intro Text -->
+    <p class="intro-text" style="margin-top: 0;">
+      <strong>Soldered MicroPython Helper</strong> is a Visual Studio Code extension that helps you get started with your MicroPython projects using a friendly graphical interface.
+    </p>
+    <p class="intro-text">
+      <em>Note:</em> This extension is <strong>experimental</strong> and currently in version <strong>0.1.1</strong>. It acts as a graphical wrapper around <code>mpremote</code> commands, making them easier to use.
+    </p>
+    <p class="intro-text">
+      You can explore the full source code on GitHub, submit issues or pull requests, and leave feedback on the extension page in the VS Code Marketplace.
+    </p>
+
+    <!-- Instructions List -->
+    <ul style="list-style-type: disc; padding-left: 20px; margin-top: 1.2rem;">
+      <li><strong>Flash Firmware:</strong> The <em>Download + Flash from Web</em> option currently supports only the <code>ESP32_GENERIC</code> board. Flashing methods may differ significantly for other microcontrollers, so be sure to consult official MicroPython or vendor-specific documentation if you're using a different board.</li>
+      <li><strong>Upload Python Scripts:</strong> You can upload the currently active file as <code>main.py</code>, keep the original filename, or select a local <code>.py</code> file from your computer.</li>
+      <li><strong>Manage Files:</strong> List, delete, run, or open files stored on the device. Double-click a file to open it in the VS Code editor.</li>
+      <li><strong>Serial Monitor:</strong> View live output from the board over serial. Starts automatically after running a script, or can be launched manually.</li>
+      <li><strong>Fetch Soldered Modules:</strong> Search and download libraries and/or examples for Soldered hardware modules. You don’t need to specify the category (e.g., Sensor, Display, Actuator).</li>
+    </ul>
+
+    <p style="margin-top: 1rem; font-size: 0.9em; color: var(--vscode-descriptionForeground);">
+      ⚠ If you encounter errors, make sure the selected port is correct and not in use by another application.
+    </p>
+
+  </div>
+</div>
 
 
 <!-- COM Port Dropdown (Shared) -->
@@ -201,11 +238,33 @@
     <label for="firmwareSelect">Top 5 Matches</label>
     <select id="firmwareSelect" size="5"></select>
 
-    <!-- Button to download firmware from the web and flash it directly to the device -->
-    <button id="flashFromWebBtn">Download + Flash from Web</button>
+    <!-- Flash From Web button with animated dots -->
+    <button id="flashFromWebBtn">
+      <span id="flashBtnText">Download + Flash from Web</span>
+      <span id="flashBtnSpinner" style="display: none;">
+        &nbsp;<span class="dot-flash">.</span><span class="dot-flash">.</span><span class="dot-flash">.</span>
+      </span>
+    </button>
 
-    <!-- Button to flash a local .bin file manually selected from the PC -->
-    <button id="flashLocalBtn">Flash .bin File from PC</button>
+    <button id="flashLocalBtn">
+      <span id="uploadBtnText">Upload Binary File from PC</span>
+      <span id="uploadBtnSpinner" style="display: none;">
+        &nbsp;<span class="dot-flash">.</span><span class="dot-flash">.</span><span class="dot-flash">.</span>
+      </span>
+    </button>
+
+
+    <!-- Visual feedback placeholder -->
+
+    <p style="
+      margin-top: 10px;
+      font-size: 0.95rem;
+      font-style: italic;
+      color: var(--vscode-descriptionForeground);
+    ">
+      Installation may take up to a minute. You only need to do it once per board.
+    </p>
+
 
   </div>
 </div>
@@ -419,11 +478,21 @@ window.addEventListener('message', (event) => {
     saveState(); // Persist to VS Code state
   }
 
+  if (message.command === 'flashStatusUpdate') {
+    const state = message.text;
+    setFlashingState(state);
+  }
+
+  if (message.command === 'uploadStatusUpdate') {
+    const state = message.text;
+    setUploadState(state);
+  }
+
   // Request a file listing from the device
   if (message.command === 'triggerListFiles') {
-    vscode.postMessage({ command: 'listFiles', port: message.port });
-  }
-});
+      vscode.postMessage({ command: 'listFiles', port: message.port });
+    }
+  });
 
 
 // Flash a local .bin file using a file picker
@@ -499,6 +568,8 @@ document.getElementById('uploadFromPcBtn').addEventListener('click', () => {
   if (!port) return alert('Please select the COM Port before uploading.');
   vscode.postMessage({ command: 'uploadPythonFromPc', port });
 });
+
+
 
 
 // Foundations for saving info
@@ -628,6 +699,59 @@ window.addEventListener('message', event => {
   }
 });
 
+
+function setUploadState(state) {
+  const btn = document.getElementById('flashLocalBtn');
+  const btnText = document.getElementById('uploadBtnText');
+  const spinner = document.getElementById('uploadBtnSpinner');
+
+  if (state === 'start') {
+    btn.disabled = true;
+    btnText.textContent = 'Flashing';
+    spinner.style.display = 'inline';
+  } else if (state === 'done') {
+    btnText.textContent = 'Success!';
+    spinner.style.display = 'none';
+    setTimeout(() => {
+      btn.disabled = false;
+      btnText.textContent = 'Upload Binary File from PC';
+    }, 1500);
+  } else if (state === 'error') {
+    btnText.textContent = 'Failed!';
+    spinner.style.display = 'none';
+    setTimeout(() => {
+      btn.disabled = false;
+      btnText.textContent = 'Upload Binary File from PC';
+    }, 1500);
+  }
+}
+
+
+function setFlashingState(state) {
+  const btn = document.getElementById('flashFromWebBtn');
+  const btnText = document.getElementById('flashBtnText');
+  const spinner = document.getElementById('flashBtnSpinner');
+
+  if (state === 'start') {
+    btn.disabled = true;
+    btnText.textContent = 'Flashing';
+    spinner.style.display = 'inline';
+  } else if (state === 'done') {
+    btnText.textContent = 'Success!';
+    spinner.style.display = 'none';
+    setTimeout(() => {
+      btn.disabled = false;
+      btnText.textContent = 'Download + Flash from Web';
+    }, 1500);
+  } else if (state === 'error') {
+    btnText.textContent = 'Failed!';
+    spinner.style.display = 'none';
+    setTimeout(() => {
+      btn.disabled = false;
+      btnText.textContent = 'Download + Flash from Web';
+    }, 1500);
+  }
+}
 
 
 
