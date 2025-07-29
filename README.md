@@ -17,9 +17,6 @@ Run the following commands in your terminal:
 ```bash
 # Install required Python tools
 pip install esptool mpremote
-
-# Install serialport Node.js package
-npm install serialport
 ```
 
 Make sure:
@@ -173,10 +170,6 @@ At Soldered, we design and manufacture a wide selection of electronic products t
 - [Web Store](https://www.soldered.com/shop)
 - [Tutorials & Projects](https://soldered.com/learn)
 - [Community & Technical support](https://soldered.com/community)
-
-### Original source
-​
-This library is possible thanks to original [Arduino_APDS9960](https://github.com/arduino-libraries/Arduino_APDS9960) library. Thank you, Arduino.
 
 ### Open-source license
 
