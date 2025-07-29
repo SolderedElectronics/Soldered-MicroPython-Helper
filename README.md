@@ -50,39 +50,13 @@ Or [install it directly from the VS Code Marketplace →](https://marketplace.vi
 
 ### Requirements
 
-1. **Node.js and npm** — [Download](https://nodejs.org/)
-2. **Python 3.x** — [Download](https://www.python.org/downloads/)
-3. **Visual Studio Code** — [Download](https://code.visualstudio.com/)
+1. **Python 3.x** — [Download](https://www.python.org/downloads/)
+2. **Visual Studio Code** — [Download](https://code.visualstudio.com/)
 
 ### Python packages (required globally or in your active environment):
 
 ```bash
 pip install esptool mpremote
-```
-
-### Serial Port Support
-
-To use the `serialport` Node.js library, native build tools must be installed:
-
-- **Windows:**
-  ```bash
-  npm install --global --production windows-build-tools
-  ```
-
-- **macOS:**
-  ```bash
-  xcode-select --install
-  ```
-
-- **Linux:**
-  ```bash
-  sudo apt-get install build-essential python3-dev
-  ```
-
-Then, install `serialport`:
-
-```bash
-npm install serialport
 ```
 
 ---
@@ -143,8 +117,32 @@ If you'd like to contribute or modify this extension locally, follow these steps
 ### 1. Install dependencies
 Make sure you have [Node.js](https://nodejs.org/), `npm`, and [Python 3.x](https://www.python.org/) installed.
 
+To use the `serialport` Node.js library, native build tools must be installed:
+
+- **Windows:**
+  ```bash
+  npm install --global --production windows-build-tools
+  ```
+
+- **macOS:**
+  ```bash
+  xcode-select --install
+  ```
+
+- **Linux:**
+  ```bash
+  sudo apt-get install build-essential python3-dev
+  ```
+
+Then, install `serialport`:
+
 ```bash
-npm install
+npm install serialport
+```
+
+Python packages (required globally or in your active environment):
+
+```bash
 pip install esptool mpremote
 ```
 
