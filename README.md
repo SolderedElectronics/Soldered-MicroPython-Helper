@@ -50,9 +50,8 @@ Or [install it directly from the VS Code Marketplace →](https://marketplace.vi
 
 ### Requirements
 
-1. **Node.js and npm** — [Download](https://nodejs.org/)
-2. **Python 3.x** — [Download](https://www.python.org/downloads/)
-3. **Visual Studio Code** — [Download](https://code.visualstudio.com/)
+1. **Python 3.x** — [Download](https://www.python.org/downloads/)
+2. **Visual Studio Code** — [Download](https://code.visualstudio.com/)
 
 ### Python packages (required globally or in your active environment):
 
