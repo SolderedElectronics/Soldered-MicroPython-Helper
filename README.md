@@ -53,6 +53,12 @@ Or [install it directly from the VS Code Marketplace →](https://marketplace.vi
 1. **Python 3.x** — [Download](https://www.python.org/downloads/)
 2. **Visual Studio Code** — [Download](https://code.visualstudio.com/)
 
+### Python packages (required globally or in your active environment):
+
+```bash
+pip install esptool mpremote
+```
+
 ---
 
 ## ⚠️ Warning: Avoid Infinite Loops Without Delay
@@ -137,7 +143,6 @@ npm install serialport
 Python packages (required globally or in your active environment):
 
 ```bash
-npm install
 pip install esptool mpremote
 ```
 
