@@ -730,8 +730,7 @@ else if (message.command === 'stopRunningCode') {
     this.startSerialMonitor(port);
   }
 
-
-  // Handle uploading a .py file from disk (not necessarily open in the editor)
+  // Handle uploading a .py file or all .py files in a folder
   else if (message.command === 'uploadPythonFromPc') {
 
     if (this.serialMonitor && this.serialMonitor.isOpen) {
@@ -740,49 +739,79 @@ else if (message.command === 'stopRunningCode') {
       this.serialMonitor = null;
     }
 
-    // Ask the user to select a Python file from their file system
-    const fileUri = await vscode.window.showOpenDialog({
-      filters: { 'Python Files': ['py'] },
+    // Let user pick either a .py file or a folder
+    const selection = await vscode.window.showOpenDialog({
+      canSelectFiles: true,
+      canSelectFolders: true,
       canSelectMany: false,
+      filters: { 'Python Files': ['py'] }
     });
-  
-    // If user canceled or selected nothing
-    if (!fileUri || fileUri.length === 0) {
-      vscode.window.showErrorMessage('No file selected.');
+
+    if (!selection || selection.length === 0) {
+      vscode.window.showErrorMessage('No file or folder selected.');
       return;
     }
-  
-    // Extract path and filename
-    const filePath = fileUri[0].fsPath;
-    const fileName = path.basename(filePath);
-  
-    // Build command to upload selected file using mpremote
-    const uploadCmd = `mpremote connect ${message.port} fs cp "${filePath}" :"${fileName}"`;
-  
+
+    const selectedPath = selection[0].fsPath;
+    const stats = fs.lstatSync(selectedPath);
+
+    let uploadCommands: string[] = [];
+
+    if (stats.isDirectory()) {
+      // Upload all .py files from selected folder
+      const files = fs.readdirSync(selectedPath)
+        .filter(file => file.endsWith('.py'));
+
+      if (files.length === 0) {
+        vscode.window.showErrorMessage('Selected folder does not contain any .py files.');
+        return;
+      }
+
+      for (const file of files) {
+        const fullPath = path.join(selectedPath, file);
+        uploadCommands.push(`mpremote connect ${message.port} fs cp "${fullPath}" :"${file}"`);
+      }
+    } else {
+      // Upload single file
+      const fileName = path.basename(selectedPath);
+      uploadCommands.push(`mpremote connect ${message.port} fs cp "${selectedPath}" :"${fileName}"`);
+    }
+
     vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
-        title: `Uploading ${fileName} from PC...`,
+        title: `Uploading Python file(s) from PC...`,
         cancellable: false,
       },
-      () =>
-        new Promise<void>((resolve, reject) => {
-          // Execute the upload
-          exec(uploadCmd, (err, stdout, stderr) => {
-            if (err) {
-              vscode.window.showErrorMessage(`Upload failed: ${stderr || err.message}`);
-              reject(err);
-            } else {
-              vscode.window.showInformationMessage(`${fileName} uploaded successfully!`);
-              resolve();
-            
-              // Refresh file list after upload
-              this._view?.webview.postMessage({ command: 'triggerListFiles', port: message.port });
-            }
-          });
-        })
+      async () => {
+        try {
+          for (const cmd of uploadCommands) {
+            await new Promise<void>((resolve, reject) => {
+              exec(cmd, (err, stdout, stderr) => {
+                if (err) {
+                  vscode.window.showErrorMessage(`Upload failed: ${stderr || err.message}`);
+                  reject(err);
+                } else {
+                  resolve();
+                }
+              });
+            });
+          }
+
+          vscode.window.showInformationMessage(`All selected file(s) uploaded successfully!`);
+          this._view?.webview.postMessage({ command: 'triggerListFiles', port: message.port });
+
+        } catch (err) {
+          if (err instanceof Error) {
+            this.outputChannel.appendLine(`❌ Upload error: ${err.message}`);
+          } else {
+            this.outputChannel.appendLine(`❌ Upload error: ${String(err)}`);
+          }
+        }
+      }
     );
   }
+
 
   // Soldered Modules
   else if (message.command === 'fetchModule') {
