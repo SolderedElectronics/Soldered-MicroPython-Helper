@@ -738,13 +738,28 @@ else if (message.command === 'stopRunningCode') {
       this.serialMonitor = null;
     }
   
-    // Let user pick a .py file or a folder
-    const selection = await vscode.window.showOpenDialog({
-      canSelectFiles: true,
-      canSelectFolders: true,
-      canSelectMany: false,
-      filters: { 'Python Files': ['py'] }
+    // Step 1: Ask user type of selection
+    const choice = await vscode.window.showQuickPick(['Single Python File', 'Folder of Python Files'], {
+      placeHolder: 'Do you want to upload a single file or a folder?'
     });
+    if (!choice) return;
+  
+    // Step 2: Show dialog based on choice
+    let selection;
+    if (choice === 'Single Python File') {
+      selection = await vscode.window.showOpenDialog({
+        canSelectFiles: true,
+        canSelectFolders: false,
+        canSelectMany: false,
+        filters: { 'Python Files': ['py'] }
+      });
+    } else {
+      selection = await vscode.window.showOpenDialog({
+        canSelectFiles: false,
+        canSelectFolders: true,
+        canSelectMany: false
+      });
+    }
   
     if (!selection || selection.length === 0) {
       vscode.window.showErrorMessage('No file or folder selected.');
@@ -753,7 +768,6 @@ else if (message.command === 'stopRunningCode') {
   
     const selectedPath = selection[0].fsPath;
     const stats = fs.lstatSync(selectedPath);
-  
     const uploadCommands: string[] = [];
   
     if (stats.isDirectory()) {
@@ -765,7 +779,7 @@ else if (message.command === 'stopRunningCode') {
           if (entry.isDirectory()) {
             walk(fullPath);
           } else if (entry.isFile() && entry.name.endsWith('.py')) {
-            const fileName = path.basename(fullPath); // Just the filename, no path
+            const fileName = path.basename(fullPath); // Just the filename, flattened
             uploadCommands.push(`mpremote connect ${message.port} fs cp "${fullPath}" :"${fileName}"`);
           }
         }
@@ -784,7 +798,7 @@ else if (message.command === 'stopRunningCode') {
       uploadCommands.push(`mpremote connect ${message.port} fs cp "${selectedPath}" :"${fileName}"`);
     }
   
-    // Upload files with progress
+    // Upload with progress
     vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
@@ -810,15 +824,12 @@ else if (message.command === 'stopRunningCode') {
           this._view?.webview.postMessage({ command: 'triggerListFiles', port: message.port });
         
         } catch (err) {
-          if (err instanceof Error) {
-            this.outputChannel.appendLine(`❌ Upload error: ${err.message}`);
-          } else {
-            this.outputChannel.appendLine(`❌ Upload error: ${String(err)}`);
-          }
+          this.outputChannel.appendLine(`❌ Upload error: ${err instanceof Error ? err.message : String(err)}`);
         }
       }
     );
   }
+
 
 
 
