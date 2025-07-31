@@ -730,57 +730,65 @@ else if (message.command === 'stopRunningCode') {
     this.startSerialMonitor(port);
   }
 
-  // Handle uploading a .py file or all .py files in a folder
   else if (message.command === 'uploadPythonFromPc') {
-
+  
     if (this.serialMonitor && this.serialMonitor.isOpen) {
       this.outputChannel.appendLine(`🛑 Stopping serial monitor before proceeding...`);
       this.serialMonitor.close();
       this.serialMonitor = null;
     }
-
-    // Let user pick either a .py file or a folder
+  
+    // Let user pick a .py file or a folder
     const selection = await vscode.window.showOpenDialog({
       canSelectFiles: true,
       canSelectFolders: true,
       canSelectMany: false,
       filters: { 'Python Files': ['py'] }
     });
-
+  
     if (!selection || selection.length === 0) {
       vscode.window.showErrorMessage('No file or folder selected.');
       return;
     }
-
+  
     const selectedPath = selection[0].fsPath;
     const stats = fs.lstatSync(selectedPath);
-
-    let uploadCommands: string[] = [];
-
+  
+    const uploadCommands: string[] = [];
+  
     if (stats.isDirectory()) {
-      // Upload all .py files from selected folder
-      const files = fs.readdirSync(selectedPath)
-        .filter(file => file.endsWith('.py'));
-
-      if (files.length === 0) {
+      // Recursively collect all .py files (flattened)
+      const walk = (dir: string) => {
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          const fullPath = path.join(dir, entry.name);
+          if (entry.isDirectory()) {
+            walk(fullPath);
+          } else if (entry.isFile() && entry.name.endsWith('.py')) {
+            const fileName = path.basename(fullPath); // Just the filename, no path
+            uploadCommands.push(`mpremote connect ${message.port} fs cp "${fullPath}" :"${fileName}"`);
+          }
+        }
+      };
+    
+      walk(selectedPath);
+    
+      if (uploadCommands.length === 0) {
         vscode.window.showErrorMessage('Selected folder does not contain any .py files.');
         return;
       }
-
-      for (const file of files) {
-        const fullPath = path.join(selectedPath, file);
-        uploadCommands.push(`mpremote connect ${message.port} fs cp "${fullPath}" :"${file}"`);
-      }
+    
     } else {
-      // Upload single file
+      // Single .py file
       const fileName = path.basename(selectedPath);
       uploadCommands.push(`mpremote connect ${message.port} fs cp "${selectedPath}" :"${fileName}"`);
     }
-
+  
+    // Upload files with progress
     vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
-        title: `Uploading Python file(s) from PC...`,
+        title: `Uploading Python file(s)...`,
         cancellable: false,
       },
       async () => {
@@ -797,10 +805,10 @@ else if (message.command === 'stopRunningCode') {
               });
             });
           }
-
-          vscode.window.showInformationMessage(`All selected file(s) uploaded successfully!`);
+        
+          vscode.window.showInformationMessage(`All .py files uploaded successfully!`);
           this._view?.webview.postMessage({ command: 'triggerListFiles', port: message.port });
-
+        
         } catch (err) {
           if (err instanceof Error) {
             this.outputChannel.appendLine(`❌ Upload error: ${err.message}`);
@@ -811,6 +819,8 @@ else if (message.command === 'stopRunningCode') {
       }
     );
   }
+
+
 
 
   // Soldered Modules

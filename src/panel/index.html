@@ -1,173 +1,211 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <style>
-    /* Base styling for the webview body */
-    body {
-      font-family: var(--vscode-font-family);
-      font-size: 13px;
-      padding: 12px;
-      background-color: var(--vscode-sideBar-background);
-      color: var(--vscode-foreground);
-    }
+<meta charset="UTF-8" />
 
-    /* Header styling for collapsible sections */
-    h4 {
-      font-size: 15px;
-      margin-bottom: 6px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-    }
+<style>
+  body {
+    font-family: var(--vscode-font-family);
+    font-size: 13px;
+    padding: 12px;
+    background-color: var(--vscode-sideBar-background);
+    color: var(--vscode-foreground);
+  }
 
-    /* Reusable section container */
-    .section {
-      margin-bottom: 24px;
-    }
+  h4 {
+    font-size: 15px;
+    margin-bottom: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+  }
 
-    /* Basic label styling */
-    label {
-      display: block;
-      margin-bottom: 6px;
-    }
+  .section {
+    margin-bottom: 24px;
+  }
 
-    /* Shared input and select element styling */
-    input, select {
-      width: 100%;
-      padding: 6px;
-      margin-bottom: 12px;
-      border-radius: 4px;
-      border: 1px solid var(--vscode-input-border);
-      background-color: var(--vscode-input-background);
-      color: var(--vscode-input-foreground);
-    }
+  label {
+    display: block;
+    margin-bottom: 6px;
+  }
 
-    /* Style for all buttons */
-    button {
-      display: block;
-      width: 100%;
-      padding: 10px 0;
-      margin-top: 10px;
-      margin-bottom: 10px;
-      background-color: var(--vscode-button-background);
-      color: var(--vscode-button-foreground);
-      font-weight: bold;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-    }
+  input, select {
+    width: 100%;
+    padding: 6px;
+    margin-bottom: 12px;
+    border-radius: 4px;
+    border: 1px solid var(--vscode-input-border);
+    background-color: var(--vscode-input-background);
+    color: var(--vscode-input-foreground);
+  }
 
-    /* Button hover effect */
-    button:hover {
-      background-color: var(--vscode-button-hoverBackground);
-    }
+  button {
+    display: block;
+    width: 100%;
+    padding: 10px 0;
+    margin-top: 10px;
+    margin-bottom: 10px;
+    background-color: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    font-weight: bold;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+  }
 
-    /* Layout for horizontal button groups */
-    .buttons-row {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 12px;
-    }
+  button:hover {
+    background-color: var(--vscode-button-hoverBackground);
+  }
 
-    .buttons-row button {
-      flex: 1;
-      margin-top: 0;
-    }
+  .buttons-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
 
-    /* Collapsible section animation and visibility control */
-    .section-content {
-      overflow: hidden;
-      max-height: 0;
-      opacity: 0;
-      transition: max-height 0.3s ease, opacity 0.3s ease, margin-top 0.3s ease;
-      margin-top: 0;
-    }
+  .buttons-row button {
+    flex: 1;
+    margin-top: 0;
+  }
 
-    /* When a section is open, expand its content */
-    .toggleable.open > .section-content {
-      max-height: 1000px; /* Arbitrary large max-height to fit contents */
-      opacity: 1;
-      margin-top: 8px;
-    }
+  .section-content {
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    transition: max-height 0.3s ease, opacity 0.3s ease, margin-top 0.3s ease;
+    margin-top: 0;
+  }
 
-    /* Rotate arrow icon when section is open */
-    .arrow {
-      display: inline-block;
-      margin-right: 8px;
-      transition: transform 0.2s ease-in-out;
-    }
+  .toggleable.open > .section-content {
+    max-height: 1000px;
+    opacity: 1;
+    margin-top: 8px;
+  }
 
-    .toggleable.open .arrow {
-      transform: rotate(90deg);
-    }
+  .arrow {
+    display: inline-block;
+    margin-right: 8px;
+    transition: transform 0.2s ease-in-out;
+  }
 
-.app-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 20px;
-  border-bottom: 1px solid var(--vscode-editorGroup-border);
-  padding-bottom: 10px;
-}
+  .toggleable.open .arrow {
+    transform: rotate(90deg);
+  }
 
-.app-logo {
-  width: 32px;
-  height: 32px;
-  color: var(--vscode-foreground); /* Dynamically uses the current theme text color */
-  filter: invert(1);
-}
+  .app-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--vscode-editorGroup-border);
+    padding-bottom: 10px;
+  }
 
-.app-title {
-  font-size: 18px;
-  font-weight: bold;
-  margin: 0;
-  color: var(--vscode-foreground);
-}
+  .app-logo {
+    width: 32px;
+    height: 32px;
+    filter: invert(1);
+  }
 
-.intro-section {
-  max-width: 700px;
-  margin: 0 auto 2rem auto;
-  text-align: center;
-  line-height: 1.6;
-}
+  .app-title {
+    font-size: 18px;
+    font-weight: bold;
+    margin: 0;
+    color: var(--vscode-foreground);
+  }
 
-.intro-text {
-  margin-top: 1rem;
-  font-size: 0.95rem;
-  color: var(--vscode-foreground);
-}
+  .icon-button-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin: 12px 0;
+  }
 
-.intro-text a {
-  color: var(--vscode-textLink-foreground);
-  text-decoration: none;
-}
+  .icon-button {
+    background-color: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    border: none;
+    border-radius: 6px;
+    padding: 8px;
+    width: 100%;
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s ease;
+    cursor: pointer;
+  }
 
-.intro-text a:hover {
-  text-decoration: underline;
-}
+  .icon-button:hover {
+    background-color: var(--vscode-button-hoverBackground);
+  }
 
-.dot-flash {
-  animation: flashDots 1.2s infinite steps(1);
-  opacity: 0.2;
-  margin-left: 1px;
-}
+  .icon-button svg {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+  }
 
-.dot-flash:nth-child(1) { animation-delay: 0s; }
-.dot-flash:nth-child(2) { animation-delay: 0.2s; }
-.dot-flash:nth-child(3) { animation-delay: 0.4s; }
-
-@keyframes flashDots {
-  0%   { opacity: 0.2; }
-  50%  { opacity: 1; }
-  100% { opacity: 0.2; }
-}
+  .icon-button:focus {
+    outline: 2px solid var(--vscode-focusBorder);
+    outline-offset: 2px;
+  }
 
 
+  .icon-button-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;            /* tighter spacing */
+    margin-bottom: 5px;
+  }
+  
+  .icon-button-row .icon-button {
+    width: 36px;
+    height: 36px;
+    flex: 0 0 auto;      /* prevent stretching */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+    border-radius: 6px;
+  }
 
 
-  </style>
+  #fileSelect {
+    margin-top: 10px;
+  }
+
+  .icon-block {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .upload-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .file-action-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .run-action-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+</style>
 </head>
+
+
 
 <body>
 
@@ -269,47 +307,103 @@
   </div>
 </div>
 
-<!-- Upload & Manage Section -->
 <!-- Collapsible section for uploading Python files and managing them on the device -->
+<!-- Upload & Manage Section -->
 <div class="section toggleable" id="uploadSection">
-
-  <!-- Clickable section header with arrow icon -->
   <h4 onclick="toggleSection('uploadSection')">
     <span class="arrow">▶</span> Upload & Manage Python Scripts
   </h4>
 
-  <!-- Hidden content that expands when section is open -->
   <div class="section-content">
 
-    <!-- Upload the currently active Python file in VS Code and rename it to main.py on the device -->
-    <button id="uploadPythonBtn">Upload Active Python File as main.py</button>
+    <!-- Row 1: Upload active, upload from PC, list files, refresh -->
+    <div class="icon-button-row">
+      <button id="uploadAsIsBtn" class="icon-button" title="Upload active Python file">
+        <!-- file-up icon -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <path d="M12 12v6"/>
+          <path d="M9 15l3-3 3 3"/>
+        </svg>
+      </button>
 
-    <!-- Upload the currently active Python file to the device without renaming -->
-    <button id="uploadAsIsBtn">Upload Active Python File</button>
+      <button id="uploadFromPcBtn" class="icon-button" title="Upload Python file from PC">
+        <!-- monitor-up icon -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+          <line x1="8" y1="21" x2="16" y2="21"/>
+          <line x1="12" y1="17" x2="12" y2="21"/>
+          <path d="M12 13V7"/>
+          <path d="M9 10l3-3 3 3"/>
+        </svg>
+      </button>
 
-    <!-- Upload a Python file from the user's file system (no need for it to be open in the editor) -->
-    <button id="uploadFromPcBtn">Upload Python File from PC</button>
+      <button id="listFilesBtn" class="icon-button" title="List files on device">
+        <!-- list icon -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="8" y1="6" x2="21" y2="6" />
+          <line x1="8" y1="12" x2="21" y2="12" />
+          <line x1="8" y1="18" x2="21" y2="18" />
+          <line x1="3" y1="6" x2="3.01" y2="6" />
+          <line x1="3" y1="12" x2="3.01" y2="12" />
+          <line x1="3" y1="18" x2="3.01" y2="18" />
+        </svg>
+      </button>
 
-    <!-- Buttons for listing or refreshing the list of files stored on the device -->
-    <div class="buttons-row">
-      <button id="listFilesBtn">List Files</button>
-      <button id="refreshBtn">Refresh Files</button>
+      <button id="refreshBtn" class="icon-button" title="Refresh file list">
+        <!-- refresh-ccw icon -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="1 4 1 10 7 10" />
+          <path d="M3.51 15a9 9 0 1 0 .49-7" />
+        </svg>
+      </button>
     </div>
 
-    <!-- Dropdown (multi-line) for selecting files on the device -->
+    <!-- Row 2: Run, terminal, stop, delete -->
+    <div class="icon-button-row">
+      <button id="runFileBtn" class="icon-button" title="Run selected file">
+        <!-- play icon -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="5 3 19 12 5 21 5 3" />
+        </svg>
+      </button>
+
+      <button id="serialMonitorBtn" class="icon-button" title="Start Serial Monitor">
+        <!-- terminal icon -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="4 17 10 11 4 5" />
+          <line x1="12" y1="19" x2="20" y2="19" />
+        </svg>
+      </button>
+
+      <button id="stopCodeBtn" class="icon-button" title="Stop running code">
+        <!-- square icon -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="6" y="6" width="12" height="12" />
+        </svg>
+      </button>
+
+      <button id="deleteFileBtn" class="icon-button" title="Delete selected file">
+        <!-- trash icon -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6" />
+          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+          <line x1="10" y1="11" x2="10" y2="17" />
+          <line x1="14" y1="11" x2="14" y2="17" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- File dropdown list -->
     <label for="fileSelect">Files on Device</label>
     <select id="fileSelect" size="6" style="width: 100%;"></select>
 
-    <!-- Buttons for running or deleting the selected file from the list -->
-    <div class="buttons-row">
-      <button id="runFileBtn">Run Selected File</button>
-      <button id="serialMonitorBtn">Start Serial Monitor</button>
-      <button id="stopCodeBtn">Stop Code</button>
-      <button id="deleteFileBtn">Delete Selected File</button>
-    </div>
-
   </div>
 </div>
+
+
+
 
 <!-- Fetch Soldered Module Section -->
 <div class="section toggleable" id="solderedFetchSection">
@@ -502,13 +596,6 @@ document.getElementById('flashLocalBtn').addEventListener('click', () => {
   vscode.postMessage({ command: 'flashFirmware', port });
 });
 
-// Upload active editor file as main.py
-document.getElementById('uploadPythonBtn').addEventListener('click', () => {
-  const port = document.getElementById('port').value;
-  if (!port) return alert('Please select the COM Port before uploading.');
-  vscode.postMessage({ command: 'uploadPython', port });
-});
-
 // Upload active editor file with original filename
 document.getElementById('uploadAsIsBtn').addEventListener('click', () => {
   const port = document.getElementById('port').value;
@@ -568,6 +655,8 @@ document.getElementById('uploadFromPcBtn').addEventListener('click', () => {
   if (!port) return alert('Please select the COM Port before uploading.');
   vscode.postMessage({ command: 'uploadPythonFromPc', port });
 });
+
+
 
 
 // Foundations for saving info
@@ -750,6 +839,8 @@ function setFlashingState(state) {
     }, 1500);
   }
 }
+
+
 
 
 </script>
