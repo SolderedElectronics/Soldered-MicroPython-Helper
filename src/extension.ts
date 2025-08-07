@@ -61,142 +61,146 @@ class EspFlasherViewProvider implements vscode.WebviewViewProvider {
   constructor(private readonly context: vscode.ExtensionContext) {
   }
 
-/**
- * Downloads a firmware binary from the web and flashes it to the selected device.
- * 
- * @param firmwareUrl - The full URL to the .bin firmware file.
- * @param port - The serial port where the board is connected (e.g., COM3, /dev/ttyUSB0).
- */
-
 private async handleFlashFromWeb(firmwareUrl: string, port: string) {
-  // Create a temporary path where the firmware file will be downloaded
-  const tmpPath = path.join(os.tmpdir(), path.basename(firmwareUrl));
+  const firmwareName = path.basename(firmwareUrl);
+  const tmpPath = path.join(os.tmpdir(), firmwareName);
+  const isUF2 = firmwareUrl.endsWith('.uf2');
 
-  // Download the .bin firmware file to the temporary path
+  // Download firmware
   await this.downloadFile(firmwareUrl, tmpPath);
 
-  // Construct the esptool command to flash the firmware to the device
-  const command = `python -u -m esptool --port ${port} --baud 115200 write_flash --flash_mode keep --flash_size keep --erase-all 0x1000 "${tmpPath}"`;
+  if (isUF2) {
+    // Ask user to pick UF2 mount path
+    const selectedFolder = await vscode.window.showOpenDialog({
+      canSelectFolders: true,
+      canSelectFiles: false,
+      openLabel: 'Select RP2040 drive (mass storage)',
+    });
 
-  // Log the command being executed to the extension's output channel
-  this.outputChannel.appendLine(`📤 Executing: ${command}`);
+    if (!selectedFolder || selectedFolder.length === 0) {
+      vscode.window.showWarningMessage('Firmware flash cancelled (no folder selected).');
+      return;
+    }
 
-  // Show a progress notification in VS Code while flashing is in progress
-  vscode.window.withProgress(
-    {
-      location: vscode.ProgressLocation.Notification,
-      title: 'Flashing firmware...',
-      cancellable: false,
-    },
-    () =>
-      new Promise<void>((resolve, reject) => {
-        // Execute the flashing command
-        exec(command, (err, stdout, stderr) => {
-          // Log stdout and stderr to output channel
-          this.outputChannel.appendLine('[stdout]');
-          this.outputChannel.appendLine(stdout);
-          if (stderr) {
-            this.outputChannel.appendLine('[stderr]');
-            this.outputChannel.appendLine(stderr);
-          }
+    const dest = path.join(selectedFolder[0].fsPath, firmwareName);
+    try {
+      fs.copyFileSync(tmpPath, dest);
+      vscode.window.showInformationMessage('UF2 firmware copied successfully!');
+      this.outputChannel.appendLine(`✅ UF2 copied to: ${dest}`);
+      this._view?.webview.postMessage({ command: 'flashStatusUpdate', text: 'done' });
+    } catch (err: any) {
+      vscode.window.showErrorMessage(`Failed to copy UF2 file: ${err.message}`);
+      this._view?.webview.postMessage({ command: 'flashStatusUpdate', text: 'error' });
+    }
 
-          // Show success or error message to the user
-          if (err) {
-            vscode.window.showErrorMessage(`Flash failed: ${stderr || err.message}`);
-            reject(err);
-            this._view?.webview.postMessage({
-              command: 'flashStatusUpdate',
-              text: 'error'
-            });
-          } else {
-            vscode.window.showInformationMessage('Flash successful!');
-            resolve();
-            this._view?.webview.postMessage({
-              command: 'flashStatusUpdate',
-              text: 'done'
-            });
-          
-            this._view?.webview.postMessage({ command: 'triggerListFiles', port });
-          }
+  } else {
+    // ESP32 flashing via esptool
+    const command = `python -u -m esptool --port ${port} --baud 115200 write_flash --flash_mode keep --flash_size keep --erase-all 0x1000 "${tmpPath}"`;
+    this.outputChannel.appendLine(`📤 Executing: ${command}`);
 
-                  });
-                })
-            );
+    vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: 'Flashing firmware...',
+        cancellable: false,
+      },
+      () =>
+        new Promise<void>((resolve, reject) => {
+          exec(command, (err, stdout, stderr) => {
+            this.outputChannel.appendLine('[stdout]');
+            this.outputChannel.appendLine(stdout);
+            if (stderr) {
+              this.outputChannel.appendLine('[stderr]');
+              this.outputChannel.appendLine(stderr);
+            }
+
+            if (err) {
+              vscode.window.showErrorMessage(`Flash failed: ${stderr || err.message}`);
+              reject(err);
+              this._view?.webview.postMessage({ command: 'flashStatusUpdate', text: 'error' });
+            } else {
+              vscode.window.showInformationMessage('Flash successful!');
+              resolve();
+              this._view?.webview.postMessage({ command: 'flashStatusUpdate', text: 'done' });
+              this._view?.webview.postMessage({ command: 'triggerListFiles', port });
+            }
+          });
+        })
+    );
+  }
 }
 
-/**
- * Fetches a list of available MicroPython firmware binaries (.bin files)
- * from the official micropython.org firmware download page for supported boards.
- *
- * Currently limited to 'ESP32_GENERIC' slug but can be extended easily.
- * 
- * @returns A Promise that resolves to an array of firmware file names and their download URLs.
- */
-private async fetchFirmwareList(): Promise<{ name: string, url: string }[]> {
+
+private async fetchFirmwareList(): Promise<{ name: string, url: string, boardType: string, version: string }[]> {
   const baseUrl = 'https://micropython.org';
+  const esp32Slugs = ['ESP32_GENERIC', 'ESP32_GENERIC_C3', 'ESP32_GENERIC_C2', 'ESP32_GENERIC_C6', 'ESP32_GENERIC_S2', 'ESP32_GENERIC_S3'];
+  const rp2040Slugs = ['ADAFRUIT_FEATHER_RP2040', 'ADAFRUIT_ITSYBITSY_RP2040', 'ADAFRUIT_QTPY_RP2040', 'ARDUINO_NANO_RP2040_CONNECT', 'SPARKFUN_PROMICRO'];
+  const rp2350Slugs = ['RPI_PICO2', 'RPI_PICO2_W', 'SEEED_XIAO_RP2350', 'SPARKFUN_PROMICRO_RP2350'];
 
-  // List of board slugs to search firmware for. This can be extended for more boards.
-  const boardSlugs = [
-    'ESP32_GENERIC',
-  ];
+  const allFirmwares: { name: string, url: string, boardType: string, version: string }[] = [];
 
-  const allBinaries: { name: string, url: string }[] = [];
-
-  // Fetch and parse firmware listings for each board
-  const fetchPromises = boardSlugs.map(slug => {
+  const fetchForSlug = (slug: string, extension: string, boardType: string) => {
     return new Promise<void>((resolve) => {
       const fullUrl = `${baseUrl}/download/${slug}/`;
 
-      // Log which URL is being scanned
       this.outputChannel.appendLine(`🔍 Scanning: ${fullUrl}`);
-
-      // Perform HTTPS GET request to fetch HTML content of the firmware listing page
       https.get(fullUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } }, res => {
         let data = '';
-
-        // Accumulate response data chunks
         res.on('data', chunk => data += chunk);
-
-        // Once the whole page is loaded
         res.on('end', () => {
-          const $ = cheerio.load(data);  // Use Cheerio to parse HTML
-          let count = 0;
+          const $ = cheerio.load(data);
+          let found = false;
 
-          // Find all <a> tags on the page and extract firmware links
           $('a').each((_, el) => {
+            if (found) return;
+
             const href = $(el).attr('href');
+            if (
+              href &&
+              href.endsWith(extension) &&
+              href.includes('/resources/firmware/') &&
+              /v\d+\.\d+\.\d+/.test(href) &&
+              !/(spiram|psram|ota|preview|test|IDF)/i.test(href)
+            ) {
+              const full = href.startsWith('http') ? href : `${baseUrl}${href}`;
+              const versionMatch = href.match(/v(\d+\.\d+\.\d+)/);
+              const version = versionMatch ? versionMatch[1] : 'unknown';
 
-            // We're only interested in .bin firmware files from the /resources/firmware/ path
-            if (href && href.endsWith('.bin') && href.includes('/resources/firmware/')) {
-              // Resolve relative URL to full URL
-              const binUrl = href.startsWith('http') ? href : `${baseUrl}${href}`;
-
-              allBinaries.push({
-                name: path.basename(binUrl), // Extract just the file name
-                url: binUrl
+              allFirmwares.push({
+                name: path.basename(full),
+                url: full,
+                boardType,
+                version
               });
 
-              count++;
+              this.outputChannel.appendLine(`✅ Found firmware for ${slug}: ${path.basename(full)} (v${version})`);
+              found = true;
             }
           });
 
-          this.outputChannel.appendLine(`✅ Found ${count} .bin files at ${slug}`);
+          if (!found) {
+            this.outputChannel.appendLine(`⚠️ No suitable firmware found for ${slug}`);
+          }
+
           resolve();
         });
       }).on('error', err => {
-        // Handle request failure gracefully and log it
         this.outputChannel.appendLine(`⚠️ Failed to fetch ${fullUrl}: ${err.message}`);
         resolve();
       });
     });
-  });
+  };
 
-  // Wait for all fetch operations to complete
-  await Promise.all(fetchPromises);
+  await Promise.all([
+    ...esp32Slugs.map(slug => fetchForSlug(slug, '.bin', 'ESP32')),
+    ...rp2040Slugs.map(slug => fetchForSlug(slug, '.uf2', 'RP2040')),
+    ...rp2350Slugs.map(slug => fetchForSlug(slug, '.uf2', 'RP2350')),
+  ]);
 
-  this.outputChannel.appendLine(`📦 Total firmware binaries found: ${allBinaries.length}`);
-  return allBinaries;
+  this.outputChannel.appendLine(`📦 Total firmwares found: ${allFirmwares.length}`);
+  return allFirmwares;
 }
+
 
 /**
  * Downloads a file from a given HTTPS URL and saves it to a local destination.
@@ -524,8 +528,8 @@ async resolveWebviewView(webviewView: vscode.WebviewView): Promise<void> {
     // Search using the board name entered in the frontend
     const matches = fuse.search(message.board || '');
 
-    // Limit to top 5 matches to avoid flooding the UI
-    const filtered = matches.slice(0, 5).map(m => m.item);
+    // Limit to top 10 matches to avoid flooding the UI
+    const filtered = matches.slice(0, 10).map(m => m.item);
 
     // Send the filtered list back to the Webview to populate the dropdown
     this._view?.webview.postMessage({
@@ -830,10 +834,6 @@ else if (message.command === 'stopRunningCode') {
     );
   }
 
-
-
-
-
   // Soldered Modules
   else if (message.command === 'fetchModule') {
     const { sensor, port, mode } = message;
@@ -905,6 +905,11 @@ else if (message.command === 'stopRunningCode') {
             } catch (err) {
               vscode.window.showErrorMessage(`Failed to process ${url}`);
               this.outputChannel.appendLine(`❌ Error: ${err}`);
+              this._view?.webview.postMessage({
+                command: 'moduleFetchStatus',
+                mode,
+                status: 'error'
+              });
               resolve();
             }
           });
@@ -917,6 +922,14 @@ else if (message.command === 'stopRunningCode') {
 
     vscode.window.showInformationMessage(`✅ Downloaded ${mode} files for "${sensor}"`);
     this._view?.webview.postMessage({ command: 'triggerListFiles', port });
+    this._view?.webview.postMessage({
+      command: 'moduleFetchStatus',
+      mode,        // one of: 'library', 'examples', 'all'
+      status: 'done'
+    });
+
+
+
   }
 
 

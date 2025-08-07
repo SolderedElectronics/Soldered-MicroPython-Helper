@@ -202,6 +202,30 @@
     gap: 8px;
     margin-bottom: 10px;
   }
+
+  @keyframes blink {
+    0% { opacity: 0.2; }
+    20% { opacity: 1; }
+    100% { opacity: 0.2; }
+  }
+
+  .dot-flash {
+    display: inline-block;
+    animation: blink 1.4s infinite;
+    font-weight: bold;
+    font-size: 1.2em;
+  }
+
+  .dot-flash:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+
+  .dot-flash:nth-child(3) {
+    animation-delay: 0.4s;
+  }
+
+
+
 </style>
 </head>
 
@@ -418,9 +442,28 @@
     <select id="moduleSelect" size="6"></select>
 
     <div class="buttons-row">
-      <button id="fetchLibraryBtn">Download Library</button>
-      <button id="fetchExamplesBtn">Download Examples</button>
-      <button id="fetchAllBtn">Download Both</button>
+
+      <button id="fetchLibraryBtn">
+        <span id="libBtnText">Download Library</span>
+        <span id="libBtnSpinner" style="display: none;">
+          &nbsp;<span class="dot-flash">.</span><span class="dot-flash">.</span><span class="dot-flash">.</span>
+        </span>
+      </button>
+
+      <button id="fetchExamplesBtn">
+        <span id="exBtnText">Download Examples</span>
+        <span id="exBtnSpinner" style="display: none;">
+          &nbsp;<span class="dot-flash">.</span><span class="dot-flash">.</span><span class="dot-flash">.</span>
+        </span>
+      </button>
+
+      <button id="fetchAllBtn">
+        <span id="allBtnText">Download Both</span>
+        <span id="allBtnSpinner" style="display: none;">
+          &nbsp;<span class="dot-flash">.</span><span class="dot-flash">.</span><span class="dot-flash">.</span>
+        </span>
+      </button>
+
     </div>
   </div>
 </div>
@@ -539,6 +582,10 @@ window.addEventListener('message', (event) => {
       option.textContent = opt.name;
       select.appendChild(option);
     });
+  }
+
+  if (message.command === 'moduleFetchStatus') {
+    setModuleFetchState(message.mode, message.status);
   }
 
   // Populate the COM port dropdown
@@ -761,9 +808,21 @@ const fetchModule = (mode) => {
   vscode.postMessage({ command: 'fetchModule', sensor, port, mode });
 };
 
-document.getElementById('fetchLibraryBtn')?.addEventListener('click', () => fetchModule('library'));
-document.getElementById('fetchExamplesBtn')?.addEventListener('click', () => fetchModule('examples'));
-document.getElementById('fetchAllBtn')?.addEventListener('click', () => fetchModule('all'));
+document.getElementById('fetchLibraryBtn')?.addEventListener('click', () => {
+  setModuleFetchState('library', 'start');
+  fetchModule('library');
+});
+
+document.getElementById('fetchExamplesBtn')?.addEventListener('click', () => {
+  setModuleFetchState('examples', 'start');
+  fetchModule('examples');
+});
+
+document.getElementById('fetchAllBtn')?.addEventListener('click', () => {
+  setModuleFetchState('all', 'start');
+  fetchModule('all');
+});
+
 
 // Handle list of matches from backend
 window.addEventListener('message', event => {
@@ -839,6 +898,40 @@ function setFlashingState(state) {
     }, 1500);
   }
 }
+
+function setModuleFetchState(mode, state) {
+  const map = {
+    library: ['libBtnText', 'libBtnSpinner', 'fetchLibraryBtn', 'Download Library'],
+    examples: ['exBtnText', 'exBtnSpinner', 'fetchExamplesBtn', 'Download Examples'],
+    all: ['allBtnText', 'allBtnSpinner', 'fetchAllBtn', 'Download Both']
+  };
+
+  const [textId, spinnerId, btnId, defaultText] = map[mode];
+  const text = document.getElementById(textId);
+  const spinner = document.getElementById(spinnerId);
+  const btn = document.getElementById(btnId);
+
+  if (state === 'start') {
+    btn.disabled = true;
+    text.textContent = 'Downloading';
+    spinner.style.display = 'inline';
+  } else if (state === 'done') {
+    text.textContent = 'Success!';
+    spinner.style.display = 'none';
+    setTimeout(() => {
+      btn.disabled = false;
+      text.textContent = defaultText;
+    }, 1500);
+  } else if (state === 'error') {
+    text.textContent = 'Failed!';
+    spinner.style.display = 'none';
+    setTimeout(() => {
+      btn.disabled = false;
+      text.textContent = defaultText;
+    }, 1500);
+  }
+}
+
 
 
 
