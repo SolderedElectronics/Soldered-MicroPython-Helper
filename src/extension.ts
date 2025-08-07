@@ -49,8 +49,6 @@ function execCommand(command: string): Promise<void> {
   });
 }
 
-
-
 class EspFlasherViewProvider implements vscode.WebviewViewProvider {
 
   private _view?: vscode.WebviewView;
@@ -130,11 +128,10 @@ private async handleFlashFromWeb(firmwareUrl: string, port: string) {
   }
 }
 
-
 private async fetchFirmwareList(): Promise<{ name: string, url: string, boardType: string, version: string }[]> {
   const baseUrl = 'https://micropython.org';
   const esp32Slugs = ['ESP32_GENERIC', 'ESP32_GENERIC_C3', 'ESP32_GENERIC_C2', 'ESP32_GENERIC_C6', 'ESP32_GENERIC_S2', 'ESP32_GENERIC_S3'];
-  const rp2040Slugs = ['ADAFRUIT_FEATHER_RP2040', 'ADAFRUIT_ITSYBITSY_RP2040', 'ADAFRUIT_QTPY_RP2040', 'ARDUINO_NANO_RP2040_CONNECT', 'SPARKFUN_PROMICRO'];
+  const rp2040Slugs = ['ADAFRUIT_FEATHER_RP2040', 'ADAFRUIT_ITSYBITSY_RP2040', 'ADAFRUIT_QTPY_RP2040', 'ARDUINO_NANO_RP2040_CONNECT', 'SPARKFUN_PROMICRO', 'RPI_PICO'];
   const rp2350Slugs = ['RPI_PICO2', 'RPI_PICO2_W', 'SEEED_XIAO_RP2350', 'SPARKFUN_PROMICRO_RP2350'];
 
   const allFirmwares: { name: string, url: string, boardType: string, version: string }[] = [];
@@ -201,7 +198,6 @@ private async fetchFirmwareList(): Promise<{ name: string, url: string, boardTyp
   return allFirmwares;
 }
 
-
 /**
  * Downloads a file from a given HTTPS URL and saves it to a local destination.
  * Used to fetch firmware binaries before flashing.
@@ -238,9 +234,6 @@ private async downloadFile(url: string, dest: string): Promise<void> {
     });
   });
 }
-
-
-
 
 // serial monitor part
 
@@ -280,7 +273,6 @@ private stopSerialMonitorAndReset(portPath: string) {
       if (err) {
         this.outputChannel.appendLine(`❌ Error closing serial monitor: ${err.message}`);
       } else {
-        this.outputChannel.appendLine(`🔌 Serial monitor closed.`);
       }
     });
     this.serialMonitor = null;
@@ -313,9 +305,6 @@ private async refreshState() {
   }
 }
 
-
-
-
 /**
  * Called when the Webview view is resolved and ready to be displayed.
  * This is where we set up the Webview HTML, send initial data, and hook up message listeners.
@@ -325,13 +314,11 @@ async resolveWebviewView(webviewView: vscode.WebviewView): Promise<void> {
   // Store the view reference so we can post messages to it later
   this._view = webviewView;
 
-
   webviewView.onDidChangeVisibility(() => {
     if (webviewView.visible) {
       this.refreshState();  // funkcija koju ćemo napraviti
     }
   });
-
 
   // Enable JavaScript execution in the Webview
   webviewView.webview.options = {
@@ -370,7 +357,6 @@ async resolveWebviewView(webviewView: vscode.WebviewView): Promise<void> {
       this.outputChannel.appendLine(`⚠ Ignoring ${message.command} - no port provided yet.`);
       return;
     }
-
 
   // Handle flashing from a local .bin file selected by the user
   if (message.command === 'flashFirmware') {
@@ -433,13 +419,11 @@ async resolveWebviewView(webviewView: vscode.WebviewView): Promise<void> {
           });
         })
     );
-
   }
 
   else if (message.command === 'requestRefresh') {
     await this.refreshState();
   }
-
 
   // Handle uploading the currently active Python file as 'main.py' to the device
   else if (message.command === 'uploadPython') {
@@ -713,8 +697,6 @@ else if (message.command === 'stopRunningCode') {
   this.stopSerialMonitorAndReset(port);
 }
 
-
-
   // Handle request to get a fresh list of available COM ports
   else if (message.command === 'getPorts') {
     // Query available serial ports using serialport library
@@ -927,13 +909,7 @@ else if (message.command === 'stopRunningCode') {
       mode,        // one of: 'library', 'examples', 'all'
       status: 'done'
     });
-
-
-
   }
-
-
-
 
   else if (message.command === 'searchModules') {
     const keyword = message.keyword || '';
@@ -980,8 +956,6 @@ else if (message.command === 'stopRunningCode') {
     });
   }
 
-
-
   // Handle deleting a file from the device using os.remove()
   else if (message.command === 'deleteFile') {
 
@@ -1008,7 +982,6 @@ else if (message.command === 'stopRunningCode') {
       }
     });
   }
-
 });
 }
 
@@ -1027,6 +1000,4 @@ private getHtml(): string {
 
   return html;
 }
-
-
 }

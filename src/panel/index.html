@@ -59,6 +59,7 @@
 
   .buttons-row {
     display: flex;
+    flex-wrap: wrap;
     gap: 10px;
     margin-bottom: 12px;
   }
@@ -160,8 +161,8 @@
   }
   
   .icon-button-row .icon-button {
-    width: 36px;
-    height: 36px;
+    width: 44px;
+    height: 44px;
     flex: 0 0 auto;      /* prevent stretching */
     display: flex;
     align-items: center;
@@ -224,7 +225,10 @@
     animation-delay: 0.4s;
   }
 
-
+  input[type="text"] {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
 
 </style>
 </head>
