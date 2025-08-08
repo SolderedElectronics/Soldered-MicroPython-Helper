@@ -750,7 +750,7 @@ else if (message.command === 'stopRunningCode') {
     }
   
     // Step 1: Ask user type of selection
-    const choice = await vscode.window.showQuickPick(['Single Python File', 'Folder of Python Files (inc. subfolders)'], {
+    const choice = await vscode.window.showQuickPick(['Single Python File', 'Folder of Python Files (including subfolders)'], {
       placeHolder: 'Do you want to upload a single file or a folder?'
     });
     if (!choice) return;
