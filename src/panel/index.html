@@ -282,6 +282,15 @@
 <label for="port">COM port Selection</label>
 <select id="port"></select>
 
+<p style="
+  margin-top: 10px;
+  font-size: 0.95rem;
+  font-style: italic;
+  color: var(--vscode-descriptionForeground);
+">
+  Only ESP32-WROVER-E, RP2040 and RP2350 boards are supported for now.
+</p>
+
 
 
 <!-- Flash Firmware Section -->
@@ -397,7 +406,7 @@
         </svg>
       </button>
 
-      <button id="serialMonitorBtn" class="icon-button" title="Start Serial Monitor">
+      <button id="serialMonitorBtn" class="icon-button" title="Start/Stop Serial Monitor">
         <!-- terminal icon -->
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="4 17 10 11 4 5" />
@@ -540,9 +549,6 @@ document.getElementById('stopCodeBtn').addEventListener('click', () => {
 });
 
 
-
-
-
 // Update firmware options as the user types in the search input
 document.getElementById('firmwareQuery').addEventListener('input', (e) => {
   const board = e.target.value;
@@ -604,6 +610,19 @@ window.addEventListener('message', (event) => {
       select.appendChild(option);
     });
   }
+
+  if (message.command === 'resetFlashButton') {
+    const btn = document.getElementById('flashFromWebBtn');
+    const btnText = document.getElementById('flashBtnText');
+    const spinner = document.getElementById('flashBtnSpinner');
+  
+    if (btn && btnText && spinner) {
+      btn.disabled = false;
+      btnText.textContent = 'Download + Flash from Web';
+      spinner.style.display = 'none';
+    }
+  }
+
 
   // Show a list of files currently on the device
   if (message.command === 'displayFiles') {
@@ -767,10 +786,14 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-// Track COM port selection changes and update state
+// Track COM port selection changes and update state + trigger file list
 document.getElementById('port').addEventListener('change', e => {
-  currentState.port = e.target.value;
+  const port = e.target.value;
+  currentState.port = port;
   saveState();
+
+  vscode.postMessage({ command: 'listFiles', port });
+
 });
 
 // Track changes in the firmware search input and update state
@@ -935,7 +958,6 @@ function setModuleFetchState(mode, state) {
     }, 1500);
   }
 }
-
 
 
 

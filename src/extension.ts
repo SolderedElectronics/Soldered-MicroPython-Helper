@@ -55,7 +55,6 @@ class EspFlasherViewProvider implements vscode.WebviewViewProvider {
 
   private outputChannel = vscode.window.createOutputChannel("ESP Output");
 
-
   constructor(private readonly context: vscode.ExtensionContext) {
   }
 
@@ -68,7 +67,6 @@ private async handleFlashFromWeb(firmwareUrl: string, port: string) {
   await this.downloadFile(firmwareUrl, tmpPath);
 
   if (isUF2) {
-    // Ask user to pick UF2 mount path
     const selectedFolder = await vscode.window.showOpenDialog({
       canSelectFolders: true,
       canSelectFiles: false,
@@ -77,19 +75,43 @@ private async handleFlashFromWeb(firmwareUrl: string, port: string) {
 
     if (!selectedFolder || selectedFolder.length === 0) {
       vscode.window.showWarningMessage('Firmware flash cancelled (no folder selected).');
+      this._view?.webview.postMessage({ command: 'flashStatusUpdate', text: 'error' });
       return;
     }
 
     const dest = path.join(selectedFolder[0].fsPath, firmwareName);
-    try {
-      fs.copyFileSync(tmpPath, dest);
-      vscode.window.showInformationMessage('UF2 firmware copied successfully!');
-      this.outputChannel.appendLine(`✅ UF2 copied to: ${dest}`);
-      this._view?.webview.postMessage({ command: 'flashStatusUpdate', text: 'done' });
-    } catch (err: any) {
-      vscode.window.showErrorMessage(`Failed to copy UF2 file: ${err.message}`);
-      this._view?.webview.postMessage({ command: 'flashStatusUpdate', text: 'error' });
-    }
+
+    vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: 'Flashing firmware...',
+        cancellable: false,
+      },
+      () =>
+        new Promise<void>((resolve, reject) => {
+          this._view?.webview.postMessage({ command: 'flashStatusUpdate', text: 'start' });
+          this.outputChannel.appendLine(`📤 Copying UF2 to: ${dest}`);
+
+          try {
+            fs.copyFileSync(tmpPath, dest);
+            vscode.window.showInformationMessage('UF2 firmware copied successfully!');
+            this.outputChannel.appendLine(`✅ UF2 copied to: ${dest}, unplug and replug your board now`);
+          
+            // Ne šaljemo 'done' da izbjegnemo animaciju
+            setTimeout(() => {
+              this._view?.webview.postMessage({ command: 'resetFlashButton' });
+            }, 2000);
+          
+            resolve();
+          } catch (err: any) {
+            vscode.window.showErrorMessage(`Failed to copy UF2 file: ${err.message}`);
+            this.outputChannel.appendLine(`❌ Failed to copy UF2: ${err.message}`);
+            this._view?.webview.postMessage({ command: 'flashStatusUpdate', text: 'error' });
+            reject(err);
+          }
+
+        })
+    );
 
   } else {
     // ESP32 flashing via esptool
@@ -131,8 +153,8 @@ private async handleFlashFromWeb(firmwareUrl: string, port: string) {
 private async fetchFirmwareList(): Promise<{ name: string, url: string, boardType: string, version: string }[]> {
   const baseUrl = 'https://micropython.org';
   const esp32Slugs = ['ESP32_GENERIC', 'ESP32_GENERIC_C3', 'ESP32_GENERIC_C2', 'ESP32_GENERIC_C6', 'ESP32_GENERIC_S2', 'ESP32_GENERIC_S3'];
-  const rp2040Slugs = ['ADAFRUIT_FEATHER_RP2040', 'ADAFRUIT_ITSYBITSY_RP2040', 'ADAFRUIT_QTPY_RP2040', 'ARDUINO_NANO_RP2040_CONNECT', 'SPARKFUN_PROMICRO', 'RPI_PICO'];
-  const rp2350Slugs = ['RPI_PICO2', 'RPI_PICO2_W', 'SEEED_XIAO_RP2350', 'SPARKFUN_PROMICRO_RP2350'];
+  const rp2040Slugs = ['ARDUINO_NANO_RP2040_CONNECT', 'SPARKFUN_PROMICRO', 'RPI_PICO'];
+  const rp2350Slugs = ['RPI_PICO2', 'RPI_PICO2_W', 'SPARKFUN_PROMICRO_RP2350'];
 
   const allFirmwares: { name: string, url: string, boardType: string, version: string }[] = [];
 
@@ -170,7 +192,7 @@ private async fetchFirmwareList(): Promise<{ name: string, url: string, boardTyp
                 version
               });
 
-              this.outputChannel.appendLine(`✅ Found firmware for ${slug}: ${path.basename(full)} (v${version})`);
+              // this.outputChannel.appendLine(`✅ Found firmware for ${slug}: ${path.basename(full)} (v${version})`);
               found = true;
             }
           });
@@ -642,6 +664,7 @@ else if (message.command === 'runPythonFile') {
 
   if (!filename || !port) {
     vscode.window.showErrorMessage('Filename and port are required to run the script.');
+    this.outputChannel.appendLine(`⚠️ Cannot run script: filename or port not provided.`);
     return;
   }
 
@@ -725,7 +748,7 @@ else if (message.command === 'stopRunningCode') {
     }
   
     // Step 1: Ask user type of selection
-    const choice = await vscode.window.showQuickPick(['Single Python File', 'Folder of Python Files'], {
+    const choice = await vscode.window.showQuickPick(['Single Python File', 'Folder of Python Files (inc. subfolders)'], {
       placeHolder: 'Do you want to upload a single file or a folder?'
     });
     if (!choice) return;
