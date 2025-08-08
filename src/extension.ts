@@ -704,6 +704,8 @@ else if (message.command === 'runPythonFile') {
 
         this.outputChannel.show(true);
         vscode.window.showInformationMessage(`${filename} is now running from main.py`);
+
+        
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         vscode.window.showErrorMessage(`Failed to run script: ${msg}`);
