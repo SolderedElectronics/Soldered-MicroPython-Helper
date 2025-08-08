@@ -70,7 +70,7 @@ private async handleFlashFromWeb(firmwareUrl: string, port: string) {
     const selectedFolder = await vscode.window.showOpenDialog({
       canSelectFolders: true,
       canSelectFiles: false,
-      openLabel: 'Select RP2040 drive (mass storage)',
+      openLabel: 'Select RP drive (mass storage)',
     });
 
     if (!selectedFolder || selectedFolder.length === 0) {
@@ -95,12 +95,9 @@ private async handleFlashFromWeb(firmwareUrl: string, port: string) {
           try {
             fs.copyFileSync(tmpPath, dest);
             vscode.window.showInformationMessage('UF2 firmware copied successfully!');
+            this._view?.webview.postMessage({ command: 'flashStatusUpdate', text: 'done' });
             this.outputChannel.appendLine(`✅ UF2 copied to: ${dest}, unplug and replug your board now`);
           
-            // Ne šaljemo 'done' da izbjegnemo animaciju
-            setTimeout(() => {
-              this._view?.webview.postMessage({ command: 'resetFlashButton' });
-            }, 2000);
           
             resolve();
           } catch (err: any) {
@@ -162,7 +159,7 @@ private async fetchFirmwareList(): Promise<{ name: string, url: string, boardTyp
     return new Promise<void>((resolve) => {
       const fullUrl = `${baseUrl}/download/${slug}/`;
 
-      this.outputChannel.appendLine(`🔍 Scanning: ${fullUrl}`);
+      // this.outputChannel.appendLine(`🔍 Scanning: ${fullUrl}`);
       https.get(fullUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } }, res => {
         let data = '';
         res.on('data', chunk => data += chunk);
@@ -198,7 +195,7 @@ private async fetchFirmwareList(): Promise<{ name: string, url: string, boardTyp
           });
 
           if (!found) {
-            this.outputChannel.appendLine(`⚠️ No suitable firmware found for ${slug}`);
+            // this.outputChannel.appendLine(`⚠️ No suitable firmware found for ${slug}`);
           }
 
           resolve();
@@ -216,7 +213,7 @@ private async fetchFirmwareList(): Promise<{ name: string, url: string, boardTyp
     ...rp2350Slugs.map(slug => fetchForSlug(slug, '.uf2', 'RP2350')),
   ]);
 
-  this.outputChannel.appendLine(`📦 Total firmwares found: ${allFirmwares.length}`);
+  // this.outputChannel.appendLine(`📦 Total firmwares found: ${allFirmwares.length}`);
   return allFirmwares;
 }
 
@@ -361,10 +358,15 @@ async resolveWebviewView(webviewView: vscode.WebviewView): Promise<void> {
 
   // If ports are available, automatically list files on the first port
   if (ports.length > 0) {
+    const defaultPort = ports[0].path;
+
     webviewView.webview.postMessage({
       command: 'triggerListFiles',
       port: ports[0].path,
     });
+
+    this.startSerialMonitor(defaultPort);  // ✅ AUTOSTART serial monitor
+    this.outputChannel.show();
   }
 
   // Handle incoming messages from the Webview (frontend)

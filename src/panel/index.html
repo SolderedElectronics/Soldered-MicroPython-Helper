@@ -906,6 +906,8 @@ function setFlashingState(state) {
   const btnText = document.getElementById('flashBtnText');
   const spinner = document.getElementById('flashBtnSpinner');
 
+  if (!btn || !btnText || !spinner) return;
+
   if (state === 'start') {
     btn.disabled = true;
     btnText.textContent = 'Flashing';
@@ -913,19 +915,28 @@ function setFlashingState(state) {
   } else if (state === 'done') {
     btnText.textContent = 'Success!';
     spinner.style.display = 'none';
-    setTimeout(() => {
-      btn.disabled = false;
-      btnText.textContent = 'Download + Flash from Web';
-    }, 1500);
+    setTimeout(manualResetFlashingUI, 1500);
   } else if (state === 'error') {
     btnText.textContent = 'Failed!';
     spinner.style.display = 'none';
-    setTimeout(() => {
-      btn.disabled = false;
-      btnText.textContent = 'Download + Flash from Web';
-    }, 1500);
+    setTimeout(manualResetFlashingUI, 1500);
+  } else {
+    // Catch-all for unexpected states
+    manualResetFlashingUI();
   }
 }
+
+
+function manualResetFlashingUI() {
+  const btn = document.getElementById('flashFromWebBtn');
+  const btnText = document.getElementById('flashBtnText');
+  const spinner = document.getElementById('flashBtnSpinner');
+
+  btn.disabled = false;
+  btnText.textContent = 'Download + Flash from Web';
+  spinner.style.display = 'none';
+}
+
 
 function setModuleFetchState(mode, state) {
   const map = {
