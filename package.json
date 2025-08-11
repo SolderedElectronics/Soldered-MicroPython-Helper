@@ -3,7 +3,7 @@
   "displayName": "Soldered MicroPython Helper",
   "publisher": "solderedelectronics",
   "description": "A MicroPython-focused helper for working with ESP-based boards directly inside Visual Studio Code.",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "engines": {
     "vscode": "^1.100.0"
   },
@@ -51,7 +51,12 @@
         },
         "mp.savePromptMode": {
           "type": "string",
-          "enum": ["ask", "pc", "device", "both"],
+          "enum": [
+            "ask",
+            "pc",
+            "device",
+            "both"
+          ],
           "default": "ask",
           "description": "How to save .py files when 'save to device on save' is disabled: always ask, only to PC, only to device, or to both."
         },
