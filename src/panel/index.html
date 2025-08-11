@@ -152,7 +152,6 @@
     outline-offset: 2px;
   }
 
-
   .icon-button-row {
     margin-left: 6px;
     display: flex;
@@ -171,7 +170,6 @@
     padding: 6px;
     border-radius: 6px;
   }
-
 
   #fileSelect {
     margin-top: 10px;
@@ -231,7 +229,6 @@
     box-sizing: border-box;
   }
 
-
   .port-picker {
     display: inline-flex;
     gap: 8px;
@@ -247,16 +244,13 @@
     cursor: pointer;
     transition: background-color 0.2s ease;
   }
-  
+
   #refreshPortsBtn:hover {
     background-color: var(--vscode-button-hoverBackground);
   }
 
-
 </style>
 </head>
-
-
 
 <body>
 
@@ -285,7 +279,7 @@
 
     <!-- Instructions List -->
     <ul style="list-style-type: disc; padding-left: 20px; margin-top: 1.2rem;">
-      <li><strong>Flash Firmware:</strong> The <em>Download + Flash from Web</em> option currently supports only the <code>ESP32_GENERIC</code> board. Flashing methods may differ significantly for other microcontrollers, so be sure to consult official MicroPython or vendor-specific documentation if you're using a different board.</li>
+      <li><strong>Flash Firmware:</strong> The <em>Download + Flash from Web</em> option supports <code>ESP32_GENERIC</code> (via <code>esptool</code>, <code>.bin</code>) and <code>RP2040/RP2350</code> boards (via <code>.uf2</code> copy to the boot drive; e.g., Raspberry Pi Pico / Pico W, Pico 2 / Pico 2 W, Arduino Nano RP2040 Connect, SparkFun Pro Micro RP2040/RP2350). Flashing methods may differ for other microcontrollers—consult official docs if you're using a different board.</li>
       <li><strong>Upload Python Scripts:</strong> You can upload the currently active file as <code>main.py</code>, keep the original filename, or select a local <code>.py</code> file from your computer.</li>
       <li><strong>Manage Files:</strong> List, delete, run, or open files stored on the device. Double-click a file to open it in the VS Code editor.</li>
       <li><strong>Serial Monitor:</strong> View live output from the board over serial. Starts automatically after running a script, or can be launched manually.</li>
@@ -298,7 +292,6 @@
 
   </div>
 </div>
-
 
 <!-- COM Port Dropdown (Shared) -->
 <label for="port">COM port Selection</label>
@@ -313,8 +306,6 @@
 ">
   Only ESP32-WROVER-E, RP2040 and RP2350 boards are supported for now.
 </p>
-
-
 
 <!-- Flash Firmware Section -->
 <!-- Collapsible UI section for flashing MicroPython firmware -->
@@ -351,7 +342,6 @@
       </span>
     </button>
 
-
     <!-- Visual feedback placeholder -->
 
     <p style="
@@ -362,7 +352,6 @@
     ">
       Installation may take up to a minute. You only need to do it once per board.
     </p>
-
 
   </div>
 </div>
@@ -462,9 +451,6 @@
   </div>
 </div>
 
-
-
-
 <!-- Fetch Soldered Module Section -->
 <div class="section toggleable" id="solderedFetchSection">
   <h4 onclick="toggleSection('solderedFetchSection')">
@@ -504,16 +490,10 @@
   </div>
 </div>
 
-
-
-
-
 <script>
 
 // Gain access to the VS Code Webview API
 const vscode = acquireVsCodeApi();
-
-
 
 function saveToggleState() {
   const state = {};
@@ -534,14 +514,12 @@ function restoreToggleState() {
   });
 }
 
-
 // Toggle visibility of a collapsible section by toggling the "open" class
 function toggleSection(id) {
   const section = document.getElementById(id);
   section.classList.toggle("open");
   saveToggleState();
 }
-
 
 // === Init events ===
 window.addEventListener('load', () => {
@@ -555,8 +533,6 @@ window.addEventListener('load', () => {
 window.addEventListener('focus', () => {
   vscode.postMessage({ command: 'requestRefresh' });
 });
-
-
 
 // Serial Monitor Button
 document.getElementById('serialMonitorBtn').addEventListener('click', () => {
@@ -656,7 +632,6 @@ window.addEventListener('message', (event) => {
     }
   }
 
-
   if (message.command === 'resetFlashButton') {
     const btn = document.getElementById('flashFromWebBtn');
     const btnText = document.getElementById('flashBtnText');
@@ -668,7 +643,6 @@ window.addEventListener('message', (event) => {
       spinner.style.display = 'none';
     }
   }
-
 
   // Show a list of files currently on the device
   if (message.command === 'displayFiles') {
@@ -703,7 +677,6 @@ window.addEventListener('message', (event) => {
       vscode.postMessage({ command: 'listFiles', port: message.port });
     }
   });
-
 
 // Flash a local .bin file using a file picker
 document.getElementById('flashLocalBtn').addEventListener('click', () => {
@@ -772,11 +745,7 @@ document.getElementById('uploadFromPcBtn').addEventListener('click', () => {
   vscode.postMessage({ command: 'uploadPythonFromPc', port });
 });
 
-
-
-
 // Foundations for saving info
-
 
 // Holds current state of key UI elements so it can be restored on reload
 let currentState = {
@@ -854,9 +823,6 @@ document.getElementById('firmwareSelect').addEventListener('change', e => {
   saveState();
 });
 
-
-
-
 // === Soldered Module Fetching ===
 
 const moduleSearchInput = document.getElementById('moduleSearch');
@@ -896,7 +862,6 @@ document.getElementById('fetchAllBtn')?.addEventListener('click', () => {
   fetchModule('all');
 });
 
-
 // Handle list of matches from backend
 window.addEventListener('message', event => {
   const message = event.data;
@@ -917,7 +882,6 @@ window.addEventListener('message', event => {
     }
   }
 });
-
 
 function setUploadState(state) {
   const btn = document.getElementById('flashLocalBtn');
@@ -945,7 +909,6 @@ function setUploadState(state) {
   }
 }
 
-
 function setFlashingState(state) {
   const btn = document.getElementById('flashFromWebBtn');
   const btnText = document.getElementById('flashBtnText');
@@ -971,7 +934,6 @@ function setFlashingState(state) {
   }
 }
 
-
 function manualResetFlashingUI() {
   const btn = document.getElementById('flashFromWebBtn');
   const btnText = document.getElementById('flashBtnText');
@@ -981,7 +943,6 @@ function manualResetFlashingUI() {
   btnText.textContent = 'Download + Flash from Web';
   spinner.style.display = 'none';
 }
-
 
 function setModuleFetchState(mode, state) {
   const map = {
@@ -1015,9 +976,6 @@ function setModuleFetchState(mode, state) {
     }, 1500);
   }
 }
-
-
-
 
 </script>
 </body>

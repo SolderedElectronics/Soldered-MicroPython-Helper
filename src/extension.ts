@@ -602,7 +602,7 @@ private startSerialMonitor(portPath: string) {
 
   // Handle serial port errors
   this.serialMonitor.on('error', err => {
-    this.outputChannel.appendLine(`❌ Serial error: ${err.message}`);
+    this.outputChannel.appendLine(`Serial error: ${err.message}`);
   });
 
   // Log when the monitor is closed
@@ -778,7 +778,7 @@ async resolveWebviewView(webviewView: vscode.WebviewView): Promise<void> {
       // ---- Upload active editor file to device as main.py ----
       case 'uploadPython': {
         if (this.serialMonitor && this.serialMonitor.isOpen) {
-          this.outputChannel.appendLine('🛑 Stopping serial monitor before proceeding...');
+          this.outputChannel.appendLine('Stopping serial monitor before proceeding...');
           this.serialMonitor.close();
           this.serialMonitor = null;
         }

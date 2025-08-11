@@ -10,6 +10,17 @@ Flash firmware, upload scripts, monitor serial output, and fetch Soldered librar
 
 ---
 
+## ✨ What’s New
+
+- **RP2040 & RP2350 support** — including UF2 flashing flows for supported boards.
+- **Minor visual overhaul** — cleaner layout and controls.
+- **Improved saving options** — optional *auto-save to both PC and device* on file save.  
+  You can turn this on/off in **File → Preferences → Settings** and search for **“MicroPython Tools”**.
+- **Smarter actions** — better automatic behavior when selecting ports and managing files.
+- **Upload a whole folder** — pick a directory and upload all `.py` files (recursively, including subfolders) to the device in one go.
+
+---
+
 ## 🚀 Quick Setup (Required for Extension to Work)
 
 Run the following commands in your terminal:
