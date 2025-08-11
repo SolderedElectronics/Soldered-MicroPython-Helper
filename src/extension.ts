@@ -20,15 +20,155 @@ import * as cheerio from 'cheerio';
 import Fuse from 'fuse.js';
 
 // Called when the extension is activated (e.g. when VS Code starts or the user opens the extension panel)
+// Called when the extension is activated (e.g. when VS Code starts or the user opens the extension panel)
 export function activate(context: vscode.ExtensionContext) {
-  // Register the Webview View Provider which supplies the HTML UI and handles backend logic
+  // Webview provider instance (used to ping the webview to refresh files)
+  const provider = new EspFlasherViewProvider(context);
   context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider(
-      'espFlasherWebview',                   // This must match the ID used in `package.json`
-      new EspFlasherViewProvider(context)    // The class that provides the Webview functionality
-    )
+    vscode.window.registerWebviewViewProvider('espFlasherWebview', provider)
+  );
+
+  type SaveMode = 'pc' | 'device' | 'both';
+  type SavePromptMode = 'ask' | SaveMode;
+
+  // Helper that resolves final SaveMode based on settings (and optional prompt)
+  const resolveSaveMode = async (cfg: vscode.WorkspaceConfiguration): Promise<SaveMode> => {
+    const saveToDeviceOnSave = cfg.get<boolean>('mp.saveToDeviceOnSave', true);
+    const alsoSaveLocally    = cfg.get<boolean>('mp.alsoSaveLocally', false);
+    if (saveToDeviceOnSave) {
+      return alsoSaveLocally ? 'both' : 'device';
+    }
+    let m = cfg.get<SavePromptMode>('mp.savePromptMode', 'ask');
+    if (m === 'ask') {
+      const pick = await vscode.window.showQuickPick(
+        [
+          { label: '💾 Save to PC', value: 'pc' as const },
+          { label: '⬆️ Save to device', value: 'device' as const },
+          { label: '🔀 Save to both', value: 'both' as const }
+        ],
+        { placeHolder: 'Where do you want to save this .py?' }
+      );
+      if (!pick) throw new Error('cancelled');
+      return pick.value;
+    }
+    return m; // narrowed to 'pc' | 'device' | 'both'
+  };
+
+  // Thonny-style save with settings support
+  context.subscriptions.push(
+    vscode.commands.registerCommand('mp.savePython', async () => {
+      const editor0 = vscode.window.activeTextEditor;
+      if (!editor0 || editor0.document.languageId !== 'python') {
+        await vscode.commands.executeCommand('workbench.action.files.save');
+        return;
+      }
+
+      const cfg = vscode.workspace.getConfiguration();
+      const saveAsMain = cfg.get<boolean>('mp.saveDeviceAsMain', false);
+
+      let mode: SaveMode;
+      try {
+        mode = await resolveSaveMode(cfg);
+      } catch (e) {
+        if ((e as Error).message === 'cancelled') return; // user cancelled quick pick
+        vscode.window.showErrorMessage(`Save error: ${(e as Error).message}`);
+        return;
+      }
+
+      let doc = editor0.document;
+
+      // Ensure file exists on disk and is up-to-date
+      const ensureOnDisk = async () => {
+        if (doc.isUntitled) {
+          const uri = await vscode.window.showSaveDialog({ filters: { Python: ['py'] } });
+          if (!uri) return false;
+          await vscode.workspace.fs.writeFile(uri, Buffer.from(doc.getText(), 'utf8'));
+          const diskDoc = await vscode.workspace.openTextDocument(uri);
+          await vscode.window.showTextDocument(diskDoc, { preview: false });
+        } else {
+          await vscode.commands.executeCommand('workbench.action.files.save');
+        }
+        const ed = vscode.window.activeTextEditor;
+        if (!ed) return false;
+        doc = ed.document;
+        return true;
+      };
+
+      // Use last selected port from webview, otherwise prompt
+      const pickPort = async (): Promise<string | undefined> => {
+        const lastPort = context.globalState.get<string>('mp.lastPort');
+        if (lastPort) return lastPort;
+        const ports = await SerialPort.list();
+        if (!ports.length) {
+          vscode.window.showErrorMessage('No serial ports available.');
+          return;
+        }
+        const chosen = await vscode.window.showQuickPick(
+          ports.map(p => p.path),
+          { placeHolder: 'Select a serial port' }
+        );
+        if (chosen) await context.globalState.update('mp.lastPort', chosen);
+        return chosen || undefined;
+      };
+
+      // Upload to device (and refresh the webview file list)
+      const uploadToDevice = async () => {
+        const port = await pickPort();
+        if (!port) return;
+
+        if (mode === 'device') {
+          // write buffer to temp file & upload (no local save required)
+          const tmpDir = path.join(os.tmpdir(), 'mp-save');
+          await fs.promises.mkdir(tmpDir, { recursive: true });
+          const fname   = saveAsMain ? 'main.py' : (path.basename(doc.fileName || 'code.py') || 'code.py');
+          const tmpPath = path.join(tmpDir, fname);
+          await fs.promises.writeFile(tmpPath, doc.getText(), 'utf8');
+
+          await new Promise<void>((resolve, reject) => {
+            const cmd = `mpremote connect ${port} fs cp "${tmpPath}" :${saveAsMain ? 'main.py' : `"${fname}"`}`;
+            exec(cmd, (err, _o, stderr) => err ? reject(new Error(stderr || String(err))) : resolve());
+          });
+
+          vscode.window.showInformationMessage(`✅ Saved to device (${fname}).`);
+          (provider as any).refreshFileListOnDevice?.(port);
+          return;
+        }
+
+        // For "pc" and "both": ensure on disk, then upload that file
+        const ok = await ensureOnDisk();
+        if (!ok) return;
+
+        const localPath  = doc.fileName;
+        const deviceName = saveAsMain ? 'main.py' : path.basename(localPath);
+
+        await new Promise<void>((resolve, reject) => {
+          const cmd = `mpremote connect ${port} fs cp "${localPath}" :${saveAsMain ? 'main.py' : `"${deviceName}"`}`;
+          exec(cmd, (err, _o, stderr) => err ? reject(new Error(stderr || String(err))) : resolve());
+        });
+
+        vscode.window.showInformationMessage(`⬆️ Uploaded to device (${deviceName}).`);
+        (provider as any).refreshFileListOnDevice?.(port);
+      };
+
+      try {
+        if (mode === 'pc') {
+          const ok = await ensureOnDisk();
+          if (!ok) return;
+          vscode.window.setStatusBarMessage('💾 Saved to PC', 1500);
+        } else if (mode === 'device') {
+          await uploadToDevice();
+        } else if (mode === 'both') {
+          const ok = await ensureOnDisk();
+          if (!ok) return;
+          await uploadToDevice();
+        }
+      } catch (e: any) {
+        vscode.window.showErrorMessage(`Save error: ${e.message || String(e)}`);
+      }
+    })
   );
 }
+
 
 // Called when the extension is deactivated (e.g. when VS Code shuts down or the extension is disabled)
 // You can clean up resources here if needed (nothing to clean up in this case)
@@ -57,6 +197,11 @@ class EspFlasherViewProvider implements vscode.WebviewViewProvider {
 
   constructor(private readonly context: vscode.ExtensionContext) {
   }
+
+public refreshFileListOnDevice(port: string) {
+  this._view?.webview.postMessage({ command: 'triggerListFiles', port });
+}
+
 
 private async handleFlashFromWeb(firmwareUrl: string, port: string) {
   const firmwareName = path.basename(firmwareUrl);
@@ -372,6 +517,11 @@ async resolveWebviewView(webviewView: vscode.WebviewView): Promise<void> {
   // Handle incoming messages from the Webview (frontend)
   webviewView.webview.onDidReceiveMessage(async (message) => {
     const { port } = message;
+
+    // 🔹 Remember last selected port for mp.savePython
+    if (port && typeof port === 'string' && port.trim() !== '') {
+      await this.context.globalState.update('mp.lastPort', port);
+    }
 
     // Skip this check for commands that don't need a port
     const needsPort = !['flashFirmware', 'getPorts', 'searchModules'].includes(message.command);
@@ -705,7 +855,6 @@ else if (message.command === 'runPythonFile') {
         this.outputChannel.show(true);
         vscode.window.showInformationMessage(`${filename} is now running from main.py`);
 
-        
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         vscode.window.showErrorMessage(`Failed to run script: ${msg}`);
