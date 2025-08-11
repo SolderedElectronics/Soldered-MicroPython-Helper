@@ -1,8 +1,10 @@
+// author Marko Toldi @Soldered
+
 // VS Code API for interacting with the editor, showing messages, progress, etc.
 import * as vscode from 'vscode';
 
 // Allows executing terminal/CLI commands like `mpremote` and `esptool`
-import { exec } from 'child_process';
+import { exec, spawn } from 'child_process';
 
 // Used to list available serial ports for device connection
 import { SerialPort } from 'serialport';
@@ -71,7 +73,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   /**
    * Command: mp.savePython
-   * - Behaves like Thonny save:
+   * - Different saves:
    *   - Save only to PC
    *   - Save only to device
    *   - Or both (depending on settings / prompt)
@@ -307,6 +309,9 @@ function execCommand(command: string): Promise<void> {
 // It also manages communication between the webview (frontend) and extension (backend),
 // and exposes utility methods like refreshing the file list and accessing the output channel.
 class EspFlasherViewProvider implements vscode.WebviewViewProvider {
+
+  private mpRunProc: import('child_process').ChildProcess | null = null;
+
 
   // Holds the reference to the current webview instance
   private _view?: vscode.WebviewView;
@@ -933,70 +938,118 @@ async resolveWebviewView(webviewView: vscode.WebviewView): Promise<void> {
         break;
       }
 
-      // ---- Run a Python file that exists on the device (reupload as main.py + reset + open serial) ----
+      // ---- Run (no main.py, no reset; stream output) ----
       case 'runPythonFile': {
+        // Free the port from serial monitor
         if (this.serialMonitor && this.serialMonitor.isOpen) {
           this.outputChannel.appendLine('🛑 Stopping serial monitor before proceeding...');
           this.serialMonitor.close();
           this.serialMonitor = null;
         }
-
+      
+        // If a previous run is active, kill it
+        if (this.mpRunProc) {
+          try { this.mpRunProc.kill(); } catch {}
+          this.mpRunProc = null;
+        }
+      
         const { filename, port } = message;
         if (!filename || !port) {
           vscode.window.showErrorMessage('Filename and port are required to run the script.');
           this.outputChannel.appendLine('⚠️ Cannot run script: filename or port not provided.');
           return;
         }
-
-        const tempPath = path.join(os.tmpdir(), filename);
+      
+        // 1) Download the on-device file to a temp local path
+        const tempPath = path.join(os.tmpdir(), `__run_tmp__-${path.basename(filename)}`);
         const downloadCmd = `mpremote connect ${port} fs cp :${filename} "${tempPath}"`;
-
+      
         await vscode.window.withProgress(
-          { location: vscode.ProgressLocation.Notification, title: `Running ${filename}...`, cancellable: false },
+          { location: vscode.ProgressLocation.Notification, title: `Preparing ${filename}...`, cancellable: false },
           async () => {
-            try {
-              this.outputChannel.appendLine(`⬇ Downloading ${filename} to temp...`);
-              await execCommand(downloadCmd);
-
-              const uploadCmd = `mpremote connect ${port} fs cp "${tempPath}" :main.py`;
-              this.outputChannel.appendLine('⬆ Uploading as main.py...');
-              await execCommand(uploadCmd);
-
-              const resetCmd = `mpremote connect ${port} reset`;
-              this.outputChannel.appendLine('🔁 Resetting board...');
-              await execCommand(resetCmd);
-
-              // Small delay to allow the device to boot
-              await new Promise(r => setTimeout(r, 1000));
-
-              // Start serial monitor to show program output
-              this.outputChannel.appendLine('📡 Opening serial monitor...');
-              this.startSerialMonitor(port);
-
-              this.outputChannel.show(true);
-              vscode.window.showInformationMessage(`${filename} is now running from main.py`);
-            } catch (err) {
-              const msg = err instanceof Error ? err.message : String(err);
-              vscode.window.showErrorMessage(`Failed to run script: ${msg}`);
-              this.outputChannel.appendLine(`❌ Error: ${msg}`);
-            }
+            //this.outputChannel.appendLine(`⬇ Downloading ${filename} to temp: ${tempPath}`);
+            await execCommand(downloadCmd);
           }
         );
+      
+        // 2) Run without writing main.py or resetting; stream output live
+        this.outputChannel.appendLine(`▶ Running ${filename}`);
+        this.outputChannel.show(true);
+      
+        const args = ['connect', port, 'run', tempPath];
+        const child = spawn('mpremote', args, { shell: false });
+      
+        this.mpRunProc = child;
+      
+        child.stdout.on('data', (data: Buffer) => {
+          this.outputChannel.append(data.toString('utf-8'));
+        });
+        child.stderr.on('data', (data: Buffer) => {
+          this.outputChannel.append(data.toString('utf-8'));
+        });
+        child.on('close', (code) => {
+          this.outputChannel.appendLine(`\n[run exited with code ${code ?? 0}]`);
+          this.mpRunProc = null;
+        });
+        child.on('error', (err) => {
+          vscode.window.showErrorMessage(`Failed to start mpremote run: ${err.message}`);
+          this.outputChannel.appendLine(`❌ Failed to start mpremote run: ${err.message}`);
+          this.mpRunProc = null;
+        });
+      
+        vscode.window.showInformationMessage(`${filename} is running. Use “Stop” to interrupt.`);
         break;
       }
 
-      // ---- Stop currently running code: close serial and reset device ----
       case 'stopRunningCode': {
         const { port } = message;
         if (!port) {
           vscode.window.showErrorMessage('Port is required to stop running code.');
           return;
         }
-        this.stopSerialMonitorAndReset(port);
+      
+        // Stop the running 'mpremote run' process if any
+        if (this.mpRunProc) {
+          try { this.mpRunProc.kill(); } catch {}
+          this.mpRunProc = null;
+        }
+      
+        // Close serial monitor if open
+        if (this.serialMonitor && this.serialMonitor.isOpen) {
+          this.serialMonitor.close();
+          this.serialMonitor = null;
+        }
+      
+        // Exec helper with timeout so we don't hang if the device drops the link mid-command
+        const execWithTimeout = (cmd: string, ms: number) =>
+          new Promise<void>((resolve, reject) => {
+            const child = exec(cmd, (err, _stdout, stderr) => {
+              if (err) {
+                // If we killed it due to timeout, treat as success
+                // @ts-ignore
+                if (child.killed) return resolve();
+                return reject(new Error(stderr || err.message));
+              }
+              resolve();
+            });
+            const t = setTimeout(() => {
+              try { child.kill(); } catch {}
+            }, ms);
+            child.on('exit', () => clearTimeout(t));
+          });
+        
+        // Reset the device (hard reset style), but never block indefinitely
+        try {
+          await execWithTimeout(`mpremote connect ${port} exec "import machine; machine.reset()"`, 2500);
+          this.outputChannel.appendLine('🔁 Device reset requested.');
+        } catch (e: any) {
+          this.outputChannel.appendLine(`❌ Error resetting device: ${e.message || String(e)}`);
+        }
+      
         break;
       }
-
-      // ---- Ask for an updated list of ports ----
+    
+          // ---- Ask for an updated list of ports ----
       case 'getPorts': {
         const ports = await SerialPort.list();
         this._view?.webview.postMessage({
