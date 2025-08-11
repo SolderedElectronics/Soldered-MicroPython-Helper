@@ -1048,7 +1048,7 @@ async resolveWebviewView(webviewView: vscode.WebviewView): Promise<void> {
               });
             });
           });
-          this.outputChannel.appendLine('Stopping code (interrupt & soft reset)');
+          this.outputChannel.appendLine('Stopping code');
         } catch (e: any) {
           this.outputChannel.appendLine(`⚠️ Could not send ^C/^D via serial: ${e?.message || e}`);
           // Fallback: do a quick reset via mpremote, but with a hard timeout so we never hang
