@@ -629,7 +629,7 @@ private stopSerialMonitorAndReset(portPath: string) {
   }
 
   // Optional: Send a reset command to the device
-  const resetCmd = `mpremote connect ${portPath} reset`;
+  const resetCmd = `mpremote connect ${portPath} soft-reset`;
   exec(resetCmd, (err, _stdout, stderr) => {
     if (err) {
       this.outputChannel.appendLine(`❌ Error resetting device: ${stderr || err.message}`);
@@ -1002,48 +1002,87 @@ async resolveWebviewView(webviewView: vscode.WebviewView): Promise<void> {
       }
 
       case 'stopRunningCode': {
-        const { port } = message;
+        const { port, keepMonitor } = message as { port?: string; keepMonitor?: boolean };
         if (!port) {
           vscode.window.showErrorMessage('Port is required to stop running code.');
           return;
         }
       
-        // Stop the running 'mpremote run' process if any
+        // 1) Stop any active 'mpremote run' process
+        const killProc = (proc: import('child_process').ChildProcess, timeoutMs = 800) =>
+          new Promise<void>((resolve) => {
+            let done = false;
+            const finish = () => { if (!done) { done = true; resolve(); } };
+            try { proc.kill('SIGINT'); } catch {}
+            const t = setTimeout(() => { try { proc.kill('SIGKILL'); } catch {} finish(); }, timeoutMs);
+            proc.on('exit', () => { clearTimeout(t); finish(); });
+            proc.on('close', () => { clearTimeout(t); finish(); });
+            proc.on('error', () => { clearTimeout(t); finish(); });
+          });
+        
         if (this.mpRunProc) {
-          try { this.mpRunProc.kill(); } catch {}
+          await killProc(this.mpRunProc);
           this.mpRunProc = null;
         }
       
-        // Close serial monitor if open
+        // 2) Close serial monitor to free the port (we'll optionally reopen later)
+        const wantReopen = !!keepMonitor;
         if (this.serialMonitor && this.serialMonitor.isOpen) {
           this.serialMonitor.close();
           this.serialMonitor = null;
         }
       
-        // Exec helper with timeout so we don't hang if the device drops the link mid-command
-        const execWithTimeout = (cmd: string, ms: number) =>
-          new Promise<void>((resolve, reject) => {
-            const child = exec(cmd, (err, _stdout, stderr) => {
-              if (err) {
-                // If we killed it due to timeout, treat as success
-                // @ts-ignore
-                if (child.killed) return resolve();
-                return reject(new Error(stderr || err.message));
-              }
-              resolve();
-            });
-            const t = setTimeout(() => {
-              try { child.kill(); } catch {}
-            }, ms);
-            child.on('exit', () => clearTimeout(t));
-          });
-        
-        // Reset the device (hard reset style), but never block indefinitely
+        // Short grace so the OS releases the port handle
+        await new Promise(r => setTimeout(r, 150));
+      
+        // 3) Send Ctrl-C, Ctrl-C, Ctrl-D directly over serial (interrupt + soft reset)
         try {
-          await execWithTimeout(`mpremote connect ${port} exec "import machine; machine.reset()"`, 2500);
-          this.outputChannel.appendLine('🔁 Device reset requested.');
+          await new Promise<void>((resolve, reject) => {
+            const tmp = new SerialPort({ path: port, baudRate: 115200, autoOpen: false });
+            tmp.open(err => {
+              if (err) return reject(err);
+              const seq = Buffer.from([0x03, 0x03, 0x04]); // ^C ^C ^D
+              tmp.write(seq, (werr) => {
+                if (werr) return reject(werr);
+                tmp.drain(() => tmp.close(() => resolve()));
+              });
+            });
+          });
+          this.outputChannel.appendLine('Stopping code (interrupt & soft reset)');
         } catch (e: any) {
-          this.outputChannel.appendLine(`❌ Error resetting device: ${e.message || String(e)}`);
+          this.outputChannel.appendLine(`⚠️ Could not send ^C/^D via serial: ${e?.message || e}`);
+          // Fallback: do a quick reset via mpremote, but with a hard timeout so we never hang
+          const execWithTimeout = (cmd: string, ms: number) =>
+            new Promise<void>((resolve, reject) => {
+              const child = exec(cmd, (err, _o, se) => {
+                if (err) {
+                  if ((child as any).killed) return resolve();
+                  return reject(new Error(se || err.message));
+                }
+                resolve();
+              });
+              const t = setTimeout(() => { try { child.kill(); } catch {} }, ms);
+              child.on('exit', () => clearTimeout(t));
+            });
+          
+          try {
+            await execWithTimeout(`mpremote connect ${port} soft-reset`, 1500);
+            this.outputChannel.appendLine('🔁 Soft reset via mpremote.');
+          } catch {
+            try {
+              await execWithTimeout(`mpremote connect ${port} exec "import machine; machine.reset()"`, 2500);
+              this.outputChannel.appendLine('🔁 Hard reset via machine.reset().');
+            } catch (err2: any) {
+              this.outputChannel.appendLine(`❌ Reset fallback failed: ${err2?.message || String(err2)}`);
+            }
+          }
+        }
+      
+        // 4) Optionally reopen the serial monitor so the user can see the fresh prompt
+        if (wantReopen) {
+          await new Promise(r => setTimeout(r, 250));
+          this.startSerialMonitor(port);
+          this.outputChannel.appendLine('📡 Serial monitor reopened.');
         }
       
         break;
