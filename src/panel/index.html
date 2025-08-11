@@ -231,6 +231,28 @@
     box-sizing: border-box;
   }
 
+
+  .port-picker {
+    display: inline-flex;
+    gap: 8px;
+    align-items: center;
+  }
+  #refreshPortsBtn {
+    background-color: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    border: none;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+  }
+  
+  #refreshPortsBtn:hover {
+    background-color: var(--vscode-button-hoverBackground);
+  }
+
+
 </style>
 </head>
 
@@ -279,9 +301,9 @@
 
 
 <!-- COM Port Dropdown (Shared) -->
-<!-- Label and dropdown menu to let user pick a serial port for flashing/uploading -->
 <label for="port">COM port Selection</label>
 <select id="port"></select>
+<button id="refreshPortsBtn" title="Refresh ports" aria-label="Refresh ports">Refresh ports</button>
 
 <p style="
   margin-top: 10px;
@@ -549,6 +571,11 @@ document.getElementById('stopCodeBtn').addEventListener('click', () => {
   vscode.postMessage({ command: 'stopRunningCode', port });
 });
 
+// 1) Refresh button -> ask backend to rescan ports
+document.getElementById('refreshPortsBtn').addEventListener('click', () => {
+  vscode.postMessage({ command: 'getPorts' });
+});
+
 
 // Update firmware options as the user types in the search input
 document.getElementById('firmwareQuery').addEventListener('input', (e) => {
@@ -599,18 +626,36 @@ window.addEventListener('message', (event) => {
     setModuleFetchState(message.mode, message.status);
   }
 
-  // Populate the COM port dropdown
   if (message.command === 'populatePorts') {
     const select = document.getElementById('port');
-    select.innerHTML = ''; // Clear previous ports
+    const prev = select.value;                       // remember current selection
+    select.innerHTML = '';
 
-    message.ports.forEach(port => {
+    const ports = message.ports || [];
+    ports.forEach(p => {
       const option = document.createElement('option');
-      option.value = port;
-      option.textContent = port;
+      option.value = p;
+      option.textContent = p;
       select.appendChild(option);
     });
+
+    // restore previous if still present, otherwise pick first (if any)
+    let toSelect = '';
+    if (ports.includes(prev)) {
+      toSelect = prev;
+    } else if (ports.length) {
+      toSelect = ports[0];
+    }
+
+    if (toSelect) {
+      select.value = toSelect;
+      // Tell backend which port is active (so it updates mp.lastPort)
+      vscode.postMessage({ command: 'noop', port: toSelect });
+      // Optionally refresh the file list for the currently selected port
+      vscode.postMessage({ command: 'listFiles', port: toSelect });
+    }
   }
+
 
   if (message.command === 'resetFlashButton') {
     const btn = document.getElementById('flashFromWebBtn');
