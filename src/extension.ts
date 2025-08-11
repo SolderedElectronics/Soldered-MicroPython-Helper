@@ -20,13 +20,15 @@ import * as cheerio from 'cheerio';
 import Fuse from 'fuse.js';
 
 // Called when the extension is activated (e.g. when VS Code starts or the user opens the extension panel)
-// Called when the extension is activated (e.g. when VS Code starts or the user opens the extension panel)
 export function activate(context: vscode.ExtensionContext) {
-  // Webview provider instance (used to ping the webview to refresh files)
+  // Webview provider instance (we also use its OutputChannel)
   const provider = new EspFlasherViewProvider(context);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider('espFlasherWebview', provider)
   );
+
+  // Use the same output channel as serial monitor
+  const out = provider.getOutputChannel();
 
   type SaveMode = 'pc' | 'device' | 'both';
   type SavePromptMode = 'ask' | SaveMode;
@@ -57,8 +59,12 @@ export function activate(context: vscode.ExtensionContext) {
   // Thonny-style save with settings support
   context.subscriptions.push(
     vscode.commands.registerCommand('mp.savePython', async () => {
+      out.appendLine("▶ mp.savePython invoked");
+      out.show(true);
+
       const editor0 = vscode.window.activeTextEditor;
       if (!editor0 || editor0.document.languageId !== 'python') {
+        out.appendLine("No Python editor active → falling back to normal save");
         await vscode.commands.executeCommand('workbench.action.files.save');
         return;
       }
@@ -69,9 +75,15 @@ export function activate(context: vscode.ExtensionContext) {
       let mode: SaveMode;
       try {
         mode = await resolveSaveMode(cfg);
+        out.appendLine(`Resolved save mode: ${mode}`);
       } catch (e) {
-        if ((e as Error).message === 'cancelled') return; // user cancelled quick pick
-        vscode.window.showErrorMessage(`Save error: ${(e as Error).message}`);
+        const msg = (e as Error).message;
+        if (msg === 'cancelled') {
+          out.appendLine("User cancelled save mode quick pick.");
+          return;
+        }
+        vscode.window.showErrorMessage(`Save error: ${msg}`);
+        out.appendLine(`❌ Resolve mode error: ${msg}`);
         return;
       }
 
@@ -80,16 +92,25 @@ export function activate(context: vscode.ExtensionContext) {
       // Ensure file exists on disk and is up-to-date
       const ensureOnDisk = async () => {
         if (doc.isUntitled) {
+          out.appendLine("Document is untitled → prompting for save location…");
           const uri = await vscode.window.showSaveDialog({ filters: { Python: ['py'] } });
-          if (!uri) return false;
+          if (!uri) {
+            out.appendLine("User cancelled Save Dialog.");
+            return false;
+          }
           await vscode.workspace.fs.writeFile(uri, Buffer.from(doc.getText(), 'utf8'));
           const diskDoc = await vscode.workspace.openTextDocument(uri);
           await vscode.window.showTextDocument(diskDoc, { preview: false });
+          out.appendLine(`Saved untitled doc to: ${uri.fsPath}`);
         } else {
+          out.appendLine(`Saving to disk: ${doc.fileName}`);
           await vscode.commands.executeCommand('workbench.action.files.save');
         }
         const ed = vscode.window.activeTextEditor;
-        if (!ed) return false;
+        if (!ed) {
+          out.appendLine("❌ No active editor after save.");
+          return false;
+        }
         doc = ed.document;
         return true;
       };
@@ -97,17 +118,26 @@ export function activate(context: vscode.ExtensionContext) {
       // Use last selected port from webview, otherwise prompt
       const pickPort = async (): Promise<string | undefined> => {
         const lastPort = context.globalState.get<string>('mp.lastPort');
-        if (lastPort) return lastPort;
+        if (lastPort) {
+          out.appendLine(`Using last selected port: ${lastPort}`);
+          return lastPort;
+        }
         const ports = await SerialPort.list();
         if (!ports.length) {
           vscode.window.showErrorMessage('No serial ports available.');
+          out.appendLine("❌ No serial ports available.");
           return;
         }
         const chosen = await vscode.window.showQuickPick(
           ports.map(p => p.path),
           { placeHolder: 'Select a serial port' }
         );
-        if (chosen) await context.globalState.update('mp.lastPort', chosen);
+        if (chosen) {
+          await context.globalState.update('mp.lastPort', chosen);
+          out.appendLine(`Selected port: ${chosen} (saved as lastPort)`);
+        } else {
+          out.appendLine("User cancelled port selection.");
+        }
         return chosen || undefined;
       };
 
@@ -123,10 +153,20 @@ export function activate(context: vscode.ExtensionContext) {
           const fname   = saveAsMain ? 'main.py' : (path.basename(doc.fileName || 'code.py') || 'code.py');
           const tmpPath = path.join(tmpDir, fname);
           await fs.promises.writeFile(tmpPath, doc.getText(), 'utf8');
+          out.appendLine(`Uploading buffer → temp: ${tmpPath} → device:${saveAsMain ? 'main.py' : fname} on ${port}`);
 
           await new Promise<void>((resolve, reject) => {
             const cmd = `mpremote connect ${port} fs cp "${tmpPath}" :${saveAsMain ? 'main.py' : `"${fname}"`}`;
-            exec(cmd, (err, _o, stderr) => err ? reject(new Error(stderr || String(err))) : resolve());
+            out.appendLine(`Exec: ${cmd}`);
+            exec(cmd, (err, _o, stderr) => {
+              if (err) {
+                out.appendLine(`❌ Upload failed: ${stderr || err}`);
+                reject(new Error(stderr || String(err)));
+              } else {
+                out.appendLine("✅ Upload successful (device-only).");
+                resolve();
+              }
+            });
           });
 
           vscode.window.showInformationMessage(`✅ Saved to device (${fname}).`);
@@ -140,10 +180,20 @@ export function activate(context: vscode.ExtensionContext) {
 
         const localPath  = doc.fileName;
         const deviceName = saveAsMain ? 'main.py' : path.basename(localPath);
+        out.appendLine(`Uploading disk file: ${localPath} → device:${deviceName} on ${port}`);
 
         await new Promise<void>((resolve, reject) => {
           const cmd = `mpremote connect ${port} fs cp "${localPath}" :${saveAsMain ? 'main.py' : `"${deviceName}"`}`;
-          exec(cmd, (err, _o, stderr) => err ? reject(new Error(stderr || String(err))) : resolve());
+          out.appendLine(`Exec: ${cmd}`);
+          exec(cmd, (err, _o, stderr) => {
+            if (err) {
+              out.appendLine(`❌ Upload failed: ${stderr || err}`);
+              reject(new Error(stderr || String(err)));
+            } else {
+              out.appendLine("✅ Upload successful (pc/both).");
+              resolve();
+            }
+          });
         });
 
         vscode.window.showInformationMessage(`⬆️ Uploaded to device (${deviceName}).`);
@@ -154,6 +204,7 @@ export function activate(context: vscode.ExtensionContext) {
         if (mode === 'pc') {
           const ok = await ensureOnDisk();
           if (!ok) return;
+          out.appendLine("Done: saved to PC only.");
           vscode.window.setStatusBarMessage('💾 Saved to PC', 1500);
         } else if (mode === 'device') {
           await uploadToDevice();
@@ -163,12 +214,13 @@ export function activate(context: vscode.ExtensionContext) {
           await uploadToDevice();
         }
       } catch (e: any) {
-        vscode.window.showErrorMessage(`Save error: ${e.message || String(e)}`);
+        const msg = e?.message || String(e);
+        vscode.window.showErrorMessage(`Save error: ${msg}`);
+        out.appendLine(`❌ Save flow error: ${msg}`);
       }
     })
   );
 }
-
 
 // Called when the extension is deactivated (e.g. when VS Code shuts down or the extension is disabled)
 // You can clean up resources here if needed (nothing to clean up in this case)
@@ -202,6 +254,9 @@ public refreshFileListOnDevice(port: string) {
   this._view?.webview.postMessage({ command: 'triggerListFiles', port });
 }
 
+public getOutputChannel(): vscode.OutputChannel {
+  return this.outputChannel;
+}
 
 private async handleFlashFromWeb(firmwareUrl: string, port: string) {
   const firmwareName = path.basename(firmwareUrl);
