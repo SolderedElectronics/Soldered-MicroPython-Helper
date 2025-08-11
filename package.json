@@ -22,8 +22,46 @@
       {
         "command": "espFlasher.uploadPython",
         "title": "Upload Python File"
+      },
+      {
+        "command": "mp.savePython",
+        "title": "Save Python (PC or MicroPython device)"
       }
     ],
+    "keybindings": [
+      {
+        "command": "mp.savePython",
+        "key": "ctrl+s",
+        "mac": "cmd+s",
+        "when": "editorLangId == python && !inDebugMode"
+      }
+    ],
+    "configuration": {
+      "title": "MicroPython Tools",
+      "properties": {
+        "mp.saveToDeviceOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "When saving a Python file, also upload it to the connected MicroPython device (using the last selected port). If disabled, you will be prompted to choose where to save the file (PC, device, or both)."
+        },
+        "mp.alsoSaveLocally": {
+          "type": "boolean",
+          "default": true,
+          "description": "When uploading to device on save, also save the file locally to disk."
+        },
+        "mp.savePromptMode": {
+          "type": "string",
+          "enum": ["ask", "pc", "device", "both"],
+          "default": "ask",
+          "description": "How to save .py files when 'save to device on save' is disabled: always ask, only to PC, only to device, or to both."
+        },
+        "mp.saveDeviceAsMain": {
+          "type": "boolean",
+          "default": false,
+          "description": "If enabled, upload to device as main.py instead of using the original filename."
+        }
+      }
+    },
     "viewsContainers": {
       "activitybar": [
         {

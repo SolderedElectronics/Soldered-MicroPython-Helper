@@ -1,172 +1,255 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <style>
-    /* Base styling for the webview body */
-    body {
-      font-family: var(--vscode-font-family);
-      font-size: 13px;
-      padding: 12px;
-      background-color: var(--vscode-sideBar-background);
-      color: var(--vscode-foreground);
-    }
+<meta charset="UTF-8" />
 
-    /* Header styling for collapsible sections */
-    h4 {
-      font-size: 15px;
-      margin-bottom: 6px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-    }
+<style>
+  body {
+    font-family: var(--vscode-font-family);
+    font-size: 13px;
+    padding: 12px;
+    background-color: var(--vscode-sideBar-background);
+    color: var(--vscode-foreground);
+  }
 
-    /* Reusable section container */
-    .section {
-      margin-bottom: 24px;
-    }
+  h4 {
+    font-size: 15px;
+    margin-bottom: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+  }
 
-    /* Basic label styling */
-    label {
-      display: block;
-      margin-bottom: 6px;
-    }
+  .section {
+    margin-bottom: 24px;
+  }
 
-    /* Shared input and select element styling */
-    input, select {
-      width: 100%;
-      padding: 6px;
-      margin-bottom: 12px;
-      border-radius: 4px;
-      border: 1px solid var(--vscode-input-border);
-      background-color: var(--vscode-input-background);
-      color: var(--vscode-input-foreground);
-    }
+  label {
+    display: block;
+    margin-bottom: 6px;
+  }
 
-    /* Style for all buttons */
-    button {
-      display: block;
-      width: 100%;
-      padding: 10px 0;
-      margin-top: 10px;
-      margin-bottom: 10px;
-      background-color: var(--vscode-button-background);
-      color: var(--vscode-button-foreground);
-      font-weight: bold;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-    }
+  input, select {
+    width: 100%;
+    padding: 6px;
+    margin-bottom: 12px;
+    border-radius: 4px;
+    border: 1px solid var(--vscode-input-border);
+    background-color: var(--vscode-input-background);
+    color: var(--vscode-input-foreground);
+  }
 
-    /* Button hover effect */
-    button:hover {
-      background-color: var(--vscode-button-hoverBackground);
-    }
+  button {
+    display: block;
+    width: 100%;
+    padding: 10px 0;
+    margin-top: 10px;
+    margin-bottom: 10px;
+    background-color: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    font-weight: bold;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+  }
 
-    /* Layout for horizontal button groups */
-    .buttons-row {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 12px;
-    }
+  button:hover {
+    background-color: var(--vscode-button-hoverBackground);
+  }
 
-    .buttons-row button {
-      flex: 1;
-      margin-top: 0;
-    }
+  .buttons-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
 
-    /* Collapsible section animation and visibility control */
-    .section-content {
-      overflow: hidden;
-      max-height: 0;
-      opacity: 0;
-      transition: max-height 0.3s ease, opacity 0.3s ease, margin-top 0.3s ease;
-      margin-top: 0;
-    }
+  .buttons-row button {
+    flex: 1;
+    margin-top: 0;
+  }
 
-    /* When a section is open, expand its content */
-    .toggleable.open > .section-content {
-      max-height: 1000px; /* Arbitrary large max-height to fit contents */
-      opacity: 1;
-      margin-top: 8px;
-    }
+  .section-content {
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    transition: max-height 0.3s ease, opacity 0.3s ease, margin-top 0.3s ease;
+    margin-top: 0;
+  }
 
-    /* Rotate arrow icon when section is open */
-    .arrow {
-      display: inline-block;
-      margin-right: 8px;
-      transition: transform 0.2s ease-in-out;
-    }
+  .toggleable.open > .section-content {
+    max-height: 1000px;
+    opacity: 1;
+    margin-top: 8px;
+  }
 
-    .toggleable.open .arrow {
-      transform: rotate(90deg);
-    }
+  .arrow {
+    display: inline-block;
+    margin-right: 8px;
+    transition: transform 0.2s ease-in-out;
+  }
 
-.app-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 20px;
-  border-bottom: 1px solid var(--vscode-editorGroup-border);
-  padding-bottom: 10px;
-}
+  .toggleable.open .arrow {
+    transform: rotate(90deg);
+  }
 
-.app-logo {
-  width: 32px;
-  height: 32px;
-  color: var(--vscode-foreground); /* Dynamically uses the current theme text color */
-  filter: invert(1);
-}
+  .app-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--vscode-editorGroup-border);
+    padding-bottom: 10px;
+  }
 
-.app-title {
-  font-size: 18px;
-  font-weight: bold;
-  margin: 0;
-  color: var(--vscode-foreground);
-}
+  .app-logo {
+    width: 32px;
+    height: 32px;
+    filter: invert(1);
+  }
 
-.intro-section {
-  max-width: 700px;
-  margin: 0 auto 2rem auto;
-  text-align: center;
-  line-height: 1.6;
-}
+  .app-title {
+    font-size: 18px;
+    font-weight: bold;
+    margin: 0;
+    color: var(--vscode-foreground);
+  }
 
-.intro-text {
-  margin-top: 1rem;
-  font-size: 0.95rem;
-  color: var(--vscode-foreground);
-}
+  .icon-button-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin: 12px 0;
+  }
 
-.intro-text a {
-  color: var(--vscode-textLink-foreground);
-  text-decoration: none;
-}
+  .icon-button {
+    background-color: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    border: none;
+    border-radius: 6px;
+    padding: 8px;
+    width: 100%;
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s ease;
+    cursor: pointer;
+  }
 
-.intro-text a:hover {
-  text-decoration: underline;
-}
+  .icon-button:hover {
+    background-color: var(--vscode-button-hoverBackground);
+  }
 
-.dot-flash {
-  animation: flashDots 1.2s infinite steps(1);
-  opacity: 0.2;
-  margin-left: 1px;
-}
+  .icon-button svg {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+  }
 
-.dot-flash:nth-child(1) { animation-delay: 0s; }
-.dot-flash:nth-child(2) { animation-delay: 0.2s; }
-.dot-flash:nth-child(3) { animation-delay: 0.4s; }
+  .icon-button:focus {
+    outline: 2px solid var(--vscode-focusBorder);
+    outline-offset: 2px;
+  }
 
-@keyframes flashDots {
-  0%   { opacity: 0.2; }
-  50%  { opacity: 1; }
-  100% { opacity: 0.2; }
-}
+  .icon-button-row {
+    margin-left: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;            /* tighter spacing */
+    margin-bottom: 5px;
+  }
+  
+  .icon-button-row .icon-button {
+    width: 44px;
+    height: 44px;
+    flex: 0 0 auto;      /* prevent stretching */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+    border-radius: 6px;
+  }
 
+  #fileSelect {
+    margin-top: 10px;
+  }
 
+  .icon-block {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 12px;
+  }
 
+  .upload-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 10px;
+  }
 
-  </style>
+  .file-action-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .run-action-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  @keyframes blink {
+    0% { opacity: 0.2; }
+    20% { opacity: 1; }
+    100% { opacity: 0.2; }
+  }
+
+  .dot-flash {
+    display: inline-block;
+    animation: blink 1.4s infinite;
+    font-weight: bold;
+    font-size: 1.2em;
+  }
+
+  .dot-flash:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+
+  .dot-flash:nth-child(3) {
+    animation-delay: 0.4s;
+  }
+
+  input[type="text"] {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .port-picker {
+    display: inline-flex;
+    gap: 8px;
+    align-items: center;
+  }
+  #refreshPortsBtn {
+    background-color: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    border: none;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+  }
+
+  #refreshPortsBtn:hover {
+    background-color: var(--vscode-button-hoverBackground);
+  }
+
+</style>
 </head>
 
 <body>
@@ -196,7 +279,7 @@
 
     <!-- Instructions List -->
     <ul style="list-style-type: disc; padding-left: 20px; margin-top: 1.2rem;">
-      <li><strong>Flash Firmware:</strong> The <em>Download + Flash from Web</em> option currently supports only the <code>ESP32_GENERIC</code> board. Flashing methods may differ significantly for other microcontrollers, so be sure to consult official MicroPython or vendor-specific documentation if you're using a different board.</li>
+      <li><strong>Flash Firmware:</strong> The <em>Download + Flash from Web</em> option supports <code>ESP32_GENERIC</code> (via <code>esptool</code>, <code>.bin</code>) and <code>RP2040/RP2350</code> boards (via <code>.uf2</code> copy to the boot drive; e.g., Raspberry Pi Pico / Pico W, Pico 2 / Pico 2 W, Arduino Nano RP2040 Connect, SparkFun Pro Micro RP2040/RP2350). Flashing methods may differ for other microcontrollers—consult official docs if you're using a different board.</li>
       <li><strong>Upload Python Scripts:</strong> You can upload the currently active file as <code>main.py</code>, keep the original filename, or select a local <code>.py</code> file from your computer.</li>
       <li><strong>Manage Files:</strong> List, delete, run, or open files stored on the device. Double-click a file to open it in the VS Code editor.</li>
       <li><strong>Serial Monitor:</strong> View live output from the board over serial. Starts automatically after running a script, or can be launched manually.</li>
@@ -210,13 +293,19 @@
   </div>
 </div>
 
-
 <!-- COM Port Dropdown (Shared) -->
-<!-- Label and dropdown menu to let user pick a serial port for flashing/uploading -->
 <label for="port">COM port Selection</label>
 <select id="port"></select>
+<button id="refreshPortsBtn" title="Refresh ports" aria-label="Refresh ports">Refresh ports</button>
 
-
+<p style="
+  margin-top: 10px;
+  font-size: 0.95rem;
+  font-style: italic;
+  color: var(--vscode-descriptionForeground);
+">
+  Only ESP32, RP2040 and RP2350 boards are supported for now.
+</p>
 
 <!-- Flash Firmware Section -->
 <!-- Collapsible UI section for flashing MicroPython firmware -->
@@ -253,7 +342,6 @@
       </span>
     </button>
 
-
     <!-- Visual feedback placeholder -->
 
     <p style="
@@ -265,48 +353,100 @@
       Installation may take up to a minute. You only need to do it once per board.
     </p>
 
-
   </div>
 </div>
 
-<!-- Upload & Manage Section -->
 <!-- Collapsible section for uploading Python files and managing them on the device -->
+<!-- Upload & Manage Section -->
 <div class="section toggleable" id="uploadSection">
-
-  <!-- Clickable section header with arrow icon -->
   <h4 onclick="toggleSection('uploadSection')">
     <span class="arrow">▶</span> Upload & Manage Python Scripts
   </h4>
 
-  <!-- Hidden content that expands when section is open -->
   <div class="section-content">
 
-    <!-- Upload the currently active Python file in VS Code and rename it to main.py on the device -->
-    <button id="uploadPythonBtn">Upload Active Python File as main.py</button>
+    <!-- Row 1: Upload active, upload from PC, list files, refresh -->
+    <div class="icon-button-row">
+      <button id="uploadAsIsBtn" class="icon-button" title="Upload active Python file">
+        <!-- file-up icon -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <path d="M12 12v6"/>
+          <path d="M9 15l3-3 3 3"/>
+        </svg>
+      </button>
 
-    <!-- Upload the currently active Python file to the device without renaming -->
-    <button id="uploadAsIsBtn">Upload Active Python File</button>
+      <button id="uploadFromPcBtn" class="icon-button" title="Upload Python file from PC">
+        <!-- monitor-up icon -->
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+          <line x1="8" y1="21" x2="16" y2="21"/>
+          <line x1="12" y1="17" x2="12" y2="21"/>
+          <path d="M12 13V7"/>
+          <path d="M9 10l3-3 3 3"/>
+        </svg>
+      </button>
 
-    <!-- Upload a Python file from the user's file system (no need for it to be open in the editor) -->
-    <button id="uploadFromPcBtn">Upload Python File from PC</button>
+      <button id="listFilesBtn" class="icon-button" title="List files on device">
+        <!-- list icon -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="8" y1="6" x2="21" y2="6" />
+          <line x1="8" y1="12" x2="21" y2="12" />
+          <line x1="8" y1="18" x2="21" y2="18" />
+          <line x1="3" y1="6" x2="3.01" y2="6" />
+          <line x1="3" y1="12" x2="3.01" y2="12" />
+          <line x1="3" y1="18" x2="3.01" y2="18" />
+        </svg>
+      </button>
 
-    <!-- Buttons for listing or refreshing the list of files stored on the device -->
-    <div class="buttons-row">
-      <button id="listFilesBtn">List Files</button>
-      <button id="refreshBtn">Refresh Files</button>
+      <button id="refreshBtn" class="icon-button" title="Refresh file list">
+        <!-- refresh-ccw icon -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="1 4 1 10 7 10" />
+          <path d="M3.51 15a9 9 0 1 0 .49-7" />
+        </svg>
+      </button>
     </div>
 
-    <!-- Dropdown (multi-line) for selecting files on the device -->
+    <!-- Row 2: Run, terminal, stop, delete -->
+    <div class="icon-button-row">
+      <button id="runFileBtn" class="icon-button" title="Run selected file">
+        <!-- play icon -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="5 3 19 12 5 21 5 3" />
+        </svg>
+      </button>
+
+      <button id="serialMonitorBtn" class="icon-button" title="Start/Stop Serial Monitor">
+        <!-- terminal icon -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="4 17 10 11 4 5" />
+          <line x1="12" y1="19" x2="20" y2="19" />
+        </svg>
+      </button>
+
+      <button id="stopCodeBtn" class="icon-button" title="Stop running code">
+        <!-- square icon -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="6" y="6" width="12" height="12" />
+        </svg>
+      </button>
+
+      <button id="deleteFileBtn" class="icon-button" title="Delete selected file">
+        <!-- trash icon -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6" />
+          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+          <line x1="10" y1="11" x2="10" y2="17" />
+          <line x1="14" y1="11" x2="14" y2="17" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- File dropdown list -->
     <label for="fileSelect">Files on Device</label>
-    <select id="fileSelect" size="6" style="width: 100%;"></select>
-
-    <!-- Buttons for running or deleting the selected file from the list -->
-    <div class="buttons-row">
-      <button id="runFileBtn">Run Selected File</button>
-      <button id="serialMonitorBtn">Start Serial Monitor</button>
-      <button id="stopCodeBtn">Stop Code</button>
-      <button id="deleteFileBtn">Delete Selected File</button>
-    </div>
+    <select id="fileSelect" size="12" style="width: 100%;"></select>
 
   </div>
 </div>
@@ -324,23 +464,36 @@
     <select id="moduleSelect" size="6"></select>
 
     <div class="buttons-row">
-      <button id="fetchLibraryBtn">Download Library</button>
-      <button id="fetchExamplesBtn">Download Examples</button>
-      <button id="fetchAllBtn">Download Both</button>
+
+      <button id="fetchLibraryBtn">
+        <span id="libBtnText">Download Library</span>
+        <span id="libBtnSpinner" style="display: none;">
+          &nbsp;<span class="dot-flash">.</span><span class="dot-flash">.</span><span class="dot-flash">.</span>
+        </span>
+      </button>
+
+      <button id="fetchExamplesBtn">
+        <span id="exBtnText">Download Examples</span>
+        <span id="exBtnSpinner" style="display: none;">
+          &nbsp;<span class="dot-flash">.</span><span class="dot-flash">.</span><span class="dot-flash">.</span>
+        </span>
+      </button>
+
+      <button id="fetchAllBtn">
+        <span id="allBtnText">Download Both</span>
+        <span id="allBtnSpinner" style="display: none;">
+          &nbsp;<span class="dot-flash">.</span><span class="dot-flash">.</span><span class="dot-flash">.</span>
+        </span>
+      </button>
+
     </div>
   </div>
 </div>
-
-
-
-
 
 <script>
 
 // Gain access to the VS Code Webview API
 const vscode = acquireVsCodeApi();
-
-
 
 function saveToggleState() {
   const state = {};
@@ -361,14 +514,12 @@ function restoreToggleState() {
   });
 }
 
-
 // Toggle visibility of a collapsible section by toggling the "open" class
 function toggleSection(id) {
   const section = document.getElementById(id);
   section.classList.toggle("open");
   saveToggleState();
 }
-
 
 // === Init events ===
 window.addEventListener('load', () => {
@@ -383,8 +534,6 @@ window.addEventListener('focus', () => {
   vscode.postMessage({ command: 'requestRefresh' });
 });
 
-
-
 // Serial Monitor Button
 document.getElementById('serialMonitorBtn').addEventListener('click', () => {
   const port = document.getElementById('port').value;
@@ -398,8 +547,10 @@ document.getElementById('stopCodeBtn').addEventListener('click', () => {
   vscode.postMessage({ command: 'stopRunningCode', port });
 });
 
-
-
+// 1) Refresh button -> ask backend to rescan ports
+document.getElementById('refreshPortsBtn').addEventListener('click', () => {
+  vscode.postMessage({ command: 'getPorts' });
+});
 
 
 // Update firmware options as the user types in the search input
@@ -447,17 +598,50 @@ window.addEventListener('message', (event) => {
     });
   }
 
-  // Populate the COM port dropdown
+  if (message.command === 'moduleFetchStatus') {
+    setModuleFetchState(message.mode, message.status);
+  }
+
   if (message.command === 'populatePorts') {
     const select = document.getElementById('port');
-    select.innerHTML = ''; // Clear previous ports
+    const prev = select.value;                       // remember current selection
+    select.innerHTML = '';
 
-    message.ports.forEach(port => {
+    const ports = message.ports || [];
+    ports.forEach(p => {
       const option = document.createElement('option');
-      option.value = port;
-      option.textContent = port;
+      option.value = p;
+      option.textContent = p;
       select.appendChild(option);
     });
+
+    // restore previous if still present, otherwise pick first (if any)
+    let toSelect = '';
+    if (ports.includes(prev)) {
+      toSelect = prev;
+    } else if (ports.length) {
+      toSelect = ports[0];
+    }
+
+    if (toSelect) {
+      select.value = toSelect;
+      // Tell backend which port is active (so it updates mp.lastPort)
+      vscode.postMessage({ command: 'noop', port: toSelect });
+      // Optionally refresh the file list for the currently selected port
+      vscode.postMessage({ command: 'listFiles', port: toSelect });
+    }
+  }
+
+  if (message.command === 'resetFlashButton') {
+    const btn = document.getElementById('flashFromWebBtn');
+    const btnText = document.getElementById('flashBtnText');
+    const spinner = document.getElementById('flashBtnSpinner');
+  
+    if (btn && btnText && spinner) {
+      btn.disabled = false;
+      btnText.textContent = 'Download + Flash from Web';
+      spinner.style.display = 'none';
+    }
   }
 
   // Show a list of files currently on the device
@@ -494,19 +678,11 @@ window.addEventListener('message', (event) => {
     }
   });
 
-
 // Flash a local .bin file using a file picker
 document.getElementById('flashLocalBtn').addEventListener('click', () => {
   const port = document.getElementById('port').value;
   if (!port) return alert('Please select the COM Port before flashing.');
   vscode.postMessage({ command: 'flashFirmware', port });
-});
-
-// Upload active editor file as main.py
-document.getElementById('uploadPythonBtn').addEventListener('click', () => {
-  const port = document.getElementById('port').value;
-  if (!port) return alert('Please select the COM Port before uploading.');
-  vscode.postMessage({ command: 'uploadPython', port });
 });
 
 // Upload active editor file with original filename
@@ -569,11 +745,7 @@ document.getElementById('uploadFromPcBtn').addEventListener('click', () => {
   vscode.postMessage({ command: 'uploadPythonFromPc', port });
 });
 
-
-
-
 // Foundations for saving info
-
 
 // Holds current state of key UI elements so it can be restored on reload
 let currentState = {
@@ -629,10 +801,14 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-// Track COM port selection changes and update state
+// Track COM port selection changes and update state + trigger file list
 document.getElementById('port').addEventListener('change', e => {
-  currentState.port = e.target.value;
+  const port = e.target.value;
+  currentState.port = port;
   saveState();
+
+  vscode.postMessage({ command: 'listFiles', port });
+
 });
 
 // Track changes in the firmware search input and update state
@@ -646,9 +822,6 @@ document.getElementById('firmwareSelect').addEventListener('change', e => {
   currentState.selectedFirmware = e.target.value;
   saveState();
 });
-
-
-
 
 // === Soldered Module Fetching ===
 
@@ -674,9 +847,20 @@ const fetchModule = (mode) => {
   vscode.postMessage({ command: 'fetchModule', sensor, port, mode });
 };
 
-document.getElementById('fetchLibraryBtn')?.addEventListener('click', () => fetchModule('library'));
-document.getElementById('fetchExamplesBtn')?.addEventListener('click', () => fetchModule('examples'));
-document.getElementById('fetchAllBtn')?.addEventListener('click', () => fetchModule('all'));
+document.getElementById('fetchLibraryBtn')?.addEventListener('click', () => {
+  setModuleFetchState('library', 'start');
+  fetchModule('library');
+});
+
+document.getElementById('fetchExamplesBtn')?.addEventListener('click', () => {
+  setModuleFetchState('examples', 'start');
+  fetchModule('examples');
+});
+
+document.getElementById('fetchAllBtn')?.addEventListener('click', () => {
+  setModuleFetchState('all', 'start');
+  fetchModule('all');
+});
 
 // Handle list of matches from backend
 window.addEventListener('message', event => {
@@ -698,7 +882,6 @@ window.addEventListener('message', event => {
     }
   }
 });
-
 
 function setUploadState(state) {
   const btn = document.getElementById('flashLocalBtn');
@@ -726,11 +909,12 @@ function setUploadState(state) {
   }
 }
 
-
 function setFlashingState(state) {
   const btn = document.getElementById('flashFromWebBtn');
   const btnText = document.getElementById('flashBtnText');
   const spinner = document.getElementById('flashBtnSpinner');
+
+  if (!btn || !btnText || !spinner) return;
 
   if (state === 'start') {
     btn.disabled = true;
@@ -739,22 +923,59 @@ function setFlashingState(state) {
   } else if (state === 'done') {
     btnText.textContent = 'Success!';
     spinner.style.display = 'none';
-    setTimeout(() => {
-      btn.disabled = false;
-      btnText.textContent = 'Download + Flash from Web';
-    }, 1500);
+    setTimeout(manualResetFlashingUI, 1500);
   } else if (state === 'error') {
     btnText.textContent = 'Failed!';
     spinner.style.display = 'none';
-    setTimeout(() => {
-      btn.disabled = false;
-      btnText.textContent = 'Download + Flash from Web';
-    }, 1500);
+    setTimeout(manualResetFlashingUI, 1500);
+  } else {
+    // Catch-all for unexpected states
+    manualResetFlashingUI();
   }
 }
 
+function manualResetFlashingUI() {
+  const btn = document.getElementById('flashFromWebBtn');
+  const btnText = document.getElementById('flashBtnText');
+  const spinner = document.getElementById('flashBtnSpinner');
 
+  btn.disabled = false;
+  btnText.textContent = 'Download + Flash from Web';
+  spinner.style.display = 'none';
+}
 
+function setModuleFetchState(mode, state) {
+  const map = {
+    library: ['libBtnText', 'libBtnSpinner', 'fetchLibraryBtn', 'Download Library'],
+    examples: ['exBtnText', 'exBtnSpinner', 'fetchExamplesBtn', 'Download Examples'],
+    all: ['allBtnText', 'allBtnSpinner', 'fetchAllBtn', 'Download Both']
+  };
+
+  const [textId, spinnerId, btnId, defaultText] = map[mode];
+  const text = document.getElementById(textId);
+  const spinner = document.getElementById(spinnerId);
+  const btn = document.getElementById(btnId);
+
+  if (state === 'start') {
+    btn.disabled = true;
+    text.textContent = 'Downloading';
+    spinner.style.display = 'inline';
+  } else if (state === 'done') {
+    text.textContent = 'Success!';
+    spinner.style.display = 'none';
+    setTimeout(() => {
+      btn.disabled = false;
+      text.textContent = defaultText;
+    }, 1500);
+  } else if (state === 'error') {
+    text.textContent = 'Failed!';
+    spinner.style.display = 'none';
+    setTimeout(() => {
+      btn.disabled = false;
+      text.textContent = defaultText;
+    }, 1500);
+  }
+}
 
 </script>
 </body>
