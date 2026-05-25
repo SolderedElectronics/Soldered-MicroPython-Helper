@@ -64,6 +64,11 @@
           "type": "boolean",
           "default": false,
           "description": "If enabled, upload to device as main.py instead of using the original filename."
+        },
+        "mp.esptoolPath": {
+          "type": "string",
+          "default": "esptool",
+          "description": "Path to the esptool executable (e.g. 'esptool', 'esptool.py', or a full path like '/opt/homebrew/bin/esptool')."
         }
       }
     },
