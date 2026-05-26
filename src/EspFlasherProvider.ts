@@ -7,9 +7,18 @@ import { ChildProcess } from 'child_process';
 import { HandlerContext } from './types';
 import { startSerialMonitor, handleRunPythonFile, handleStopRunningCode } from './handlers/serialHandler';
 import { handleFlashFromWeb, handleFlashFirmware, fetchFirmwareList } from './handlers/flashHandler';
-import { handleListFiles, handleDeleteFile } from './handlers/fileHandler';
+import { handleListFiles, handleDeleteFile, handleDeleteAllFiles } from './handlers/fileHandler';
 import { handleUploadPython, handleUploadPythonAsIs, handleUploadPythonFromPc, handleOpenFileFromDevice } from './handlers/uploadHandler';
-import { handleFetchModule, handleGetCategories, handleGetModulesForCategory } from './handlers/moduleHandler';
+import { handleFetchModule, handleGetCategories, handleGetModulesForCategory, handleGetAllModules } from './handlers/moduleHandler';
+import { execMpremote } from './utils/execUtils';
+
+const IGNORED_PORT_PATTERNS = ['debug-console', 'Bluetooth-Incoming-Port'];
+
+function filterPorts(ports: { path: string }[]): string[] {
+  return ports
+    .map(p => p.path)
+    .filter(p => !IGNORED_PORT_PATTERNS.some(pattern => p.includes(pattern)));
+}
 
 export class EspFlasherViewProvider implements vscode.WebviewViewProvider {
 
@@ -57,17 +66,11 @@ export class EspFlasherViewProvider implements vscode.WebviewViewProvider {
    * Also triggers an initial file list refresh on the first port found.
    */
   private async refreshState(): Promise<void> {
-    const ports = await SerialPort.list();
+    const ports = filterPorts(await SerialPort.list());
     this._view?.webview.postMessage({
       command: 'populatePorts',
-      ports: ports.map(p => p.path),
+      ports,
     });
-    if (ports.length > 0) {
-      this._view?.webview.postMessage({
-        command: 'triggerListFiles',
-        port: ports[0].path,
-      });
-    }
   }
 
   /**
@@ -84,10 +87,9 @@ export class EspFlasherViewProvider implements vscode.WebviewViewProvider {
     webviewView.webview.options = { enableScripts: true };
     webviewView.webview.html = this.getHtml();
 
-    const ports = await SerialPort.list();
     webviewView.webview.postMessage({
       command: 'populatePorts',
-      ports: ports.map(p => p.path),
+      ports: filterPorts(await SerialPort.list()),
     });
 
     webviewView.webview.onDidReceiveMessage(async (message) => {
@@ -99,7 +101,7 @@ export class EspFlasherViewProvider implements vscode.WebviewViewProvider {
       }
 
       // Guard: most commands need a port
-      const needsPort = !['flashFirmware', 'getPorts', 'getCategories', 'getModulesForCategory', 'getFirmwareOptions', 'requestRefresh', 'noop'].includes(message.command);
+      const needsPort = !['flashFirmware', 'getPorts', 'getCategories', 'getModulesForCategory', 'getAllModules', 'getFirmwareOptions', 'requestRefresh', 'noop'].includes(message.command);
       if (needsPort && (!port || typeof port !== 'string' || port.trim() === '')) {
         this.outputChannel.appendLine(`[WARN] Ignoring ${message.command} - no port provided yet.`);
         return;
@@ -137,7 +139,6 @@ export class EspFlasherViewProvider implements vscode.WebviewViewProvider {
             return;
           }
           await handleFlashFromWeb(ctx, message.firmwareUrl, message.port);
-          this._view?.webview.postMessage({ command: 'flashStatusUpdate', text: 'start' });
           break;
 
         case 'openFileFromDevice':
@@ -157,10 +158,9 @@ export class EspFlasherViewProvider implements vscode.WebviewViewProvider {
           break;
 
         case 'getPorts': {
-          const availablePorts = await SerialPort.list();
           this._view?.webview.postMessage({
             command: 'populatePorts',
-            ports: availablePorts.map(p => p.path),
+            ports: filterPorts(await SerialPort.list()),
           });
           break;
         }
@@ -189,8 +189,27 @@ export class EspFlasherViewProvider implements vscode.WebviewViewProvider {
           await handleGetModulesForCategory(ctx, message);
           break;
 
+        case 'getAllModules':
+          await handleGetAllModules(ctx, message);
+          break;
+
         case 'deleteFile':
           handleDeleteFile(ctx, message);
+          break;
+
+        case 'deleteAllFiles':
+          await handleDeleteAllFiles(ctx, message);
+          break;
+
+        case 'checkMicroPython':
+          execMpremote(`mpremote connect ${port} exec "import sys; print(sys.implementation.name)"`)
+            .then(stdout => {
+              const installed = stdout.trim().toLowerCase().includes('micropython');
+              this._view?.webview.postMessage({ command: 'micropythonStatus', installed });
+            })
+            .catch(() => {
+              this._view?.webview.postMessage({ command: 'micropythonStatus', installed: false });
+            });
           break;
 
         case 'noop':

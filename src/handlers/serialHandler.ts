@@ -1,10 +1,10 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as os from 'os';
-import { exec, spawn } from 'child_process';
+import { spawn } from 'child_process';
 import { SerialPort } from 'serialport';
 import { HandlerContext } from '../types';
-import { execCommand, execWithTimeout, killProc } from '../utils/execUtils';
+import { execCommand, execMpremote, execWithTimeout, killProc } from '../utils/execUtils';
 
 /**
  * Starts the serial monitor on the given port.
@@ -50,14 +50,9 @@ export function stopSerialMonitorAndReset(ctx: HandlerContext, portPath: string)
     ctx.setSerialMonitor(null);
   }
 
-  const resetCmd = `mpremote connect ${portPath} soft-reset`;
-  exec(resetCmd, (err, _stdout, stderr) => {
-    if (err) {
-      ctx.outputChannel.appendLine(`[ERROR] Error resetting device: ${stderr || err.message}`);
-    } else {
-      ctx.outputChannel.appendLine('Device reset successfully.');
-    }
-  });
+  execMpremote(`mpremote connect ${portPath} soft-reset`)
+    .then(() => ctx.outputChannel.appendLine('Device reset successfully.'))
+    .catch(err => ctx.outputChannel.appendLine(`[ERROR] Error resetting device: ${err.message}`));
 }
 
 /**

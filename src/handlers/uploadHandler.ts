@@ -2,8 +2,8 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { exec } from 'child_process';
 import { HandlerContext } from '../types';
+import { execCommand, execMpremote } from '../utils/execUtils';
 
 /**
  * Uploads the active editor's Python file to the device as main.py.
@@ -27,18 +27,15 @@ export async function handleUploadPython(ctx: HandlerContext, message: any): Pro
 
   await vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: 'Uploading Python file as main.py...', cancellable: false },
-    () => new Promise<void>((resolve, reject) => {
-      exec(uploadCmd, (uploadError, _stdout, uploadStderr) => {
-        if (uploadError) {
-          vscode.window.showErrorMessage(`Upload failed: ${uploadStderr || uploadError.message}`);
-          reject(uploadError);
-          return;
-        }
+    async () => {
+      try {
+        await execCommand(uploadCmd, ctx.outputChannel);
         vscode.window.showInformationMessage('Python file uploaded successfully as main.py!');
         ctx.postMessage({ command: 'triggerListFiles', port });
-        resolve();
-      });
-    })
+      } catch (err: any) {
+        vscode.window.showErrorMessage(`Upload failed: ${err.message}`);
+      }
+    }
   );
 }
 
@@ -65,18 +62,15 @@ export async function handleUploadPythonAsIs(ctx: HandlerContext, message: any):
 
   await vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: `Uploading ${fileName} to device...`, cancellable: false },
-    () => new Promise<void>((resolve, reject) => {
-      exec(uploadCmd, (uploadError, _stdout, uploadStderr) => {
-        if (uploadError) {
-          vscode.window.showErrorMessage(`Upload failed: ${uploadStderr || uploadError.message}`);
-          reject(uploadError);
-          return;
-        }
+    async () => {
+      try {
+        await execCommand(uploadCmd, ctx.outputChannel);
         vscode.window.showInformationMessage(`${fileName} uploaded successfully!`);
         ctx.postMessage({ command: 'triggerListFiles', port });
-        resolve();
-      });
-    })
+      } catch (err: any) {
+        vscode.window.showErrorMessage(`Upload failed: ${err.message}`);
+      }
+    }
   );
 }
 
@@ -135,7 +129,6 @@ export async function handleUploadPythonFromPc(ctx: HandlerContext, message: any
         }
       }
     };
-
     walk(selectedPath);
 
     if (uploadCommands.length === 0) {
@@ -152,21 +145,13 @@ export async function handleUploadPythonFromPc(ctx: HandlerContext, message: any
     async () => {
       try {
         for (const cmd of uploadCommands) {
-          await new Promise<void>((resolve, reject) => {
-            exec(cmd, (err, _stdout, stderr) => {
-              if (err) {
-                vscode.window.showErrorMessage(`Upload failed: ${stderr || err.message}`);
-                reject(err);
-              } else {
-                resolve();
-              }
-            });
-          });
+          await execCommand(cmd, ctx.outputChannel);
         }
         vscode.window.showInformationMessage('All .py files uploaded successfully!');
         ctx.postMessage({ command: 'triggerListFiles', port });
-      } catch (err) {
-        ctx.outputChannel.appendLine(`[ERROR] Upload error: ${err instanceof Error ? err.message : String(err)}`);
+      } catch (err: any) {
+        vscode.window.showErrorMessage(`Upload failed: ${err.message}`);
+        ctx.outputChannel.appendLine(`[ERROR] Upload error: ${err.message}`);
       }
     }
   );
@@ -183,20 +168,14 @@ export async function handleOpenFileFromDevice(ctx: HandlerContext, message: any
   try {
     await fs.promises.mkdir(tempDir, { recursive: true });
     const cmd = `mpremote connect ${port} fs cp :"${filename}" "${localPath}"`;
-
     ctx.outputChannel.appendLine(`Downloading ${filename} from device...`);
-    exec(cmd, async (err, _stdout, stderr) => {
-      if (err) {
-        vscode.window.showErrorMessage(`Failed to download file: ${stderr || err.message}`);
-        return;
-      }
 
-      const doc = await vscode.workspace.openTextDocument(localPath);
-      await vscode.window.showTextDocument(doc, { preview: false });
-      vscode.window.showInformationMessage(`Opened ${filename} from device.`);
-    });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    vscode.window.showErrorMessage(`Failed to prepare file for editing: ${msg}`);
+    await execMpremote(cmd);
+
+    const doc = await vscode.workspace.openTextDocument(localPath);
+    await vscode.window.showTextDocument(doc, { preview: false });
+    vscode.window.showInformationMessage(`Opened ${filename} from device.`);
+  } catch (err: any) {
+    vscode.window.showErrorMessage(`Failed to download file: ${err.message}`);
   }
 }

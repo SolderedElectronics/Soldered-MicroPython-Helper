@@ -4,7 +4,7 @@ import * as path from 'path';
 import * as os from 'os';
 import * as https from 'https';
 import * as cheerio from 'cheerio';
-import { exec } from 'child_process';
+import { exec, spawn } from 'child_process';
 import { HandlerContext } from '../types';
 
 /**
@@ -94,6 +94,40 @@ export async function fetchFirmwareList(
 }
 
 /**
+ * Spawns esptool and streams its output, parsing progress percentage and
+ * sending flashProgress messages to the webview as writing proceeds.
+ */
+function streamFlashWithProgress(command: string, ctx: HandlerContext): Promise<void> {
+  return new Promise((resolve, reject) => {
+    ctx.outputChannel.appendLine(`Executing: ${command}`);
+    const child = spawn(command, [], { shell: true });
+
+    const handleChunk = (data: string) => {
+      ctx.outputChannel.append(data);
+      for (const segment of data.split(/[\r\n]+/)) {
+        const pctMatch = segment.match(/(\d+(?:\.\d+)?)%/);
+        if (pctMatch) {
+          const pct = parseFloat(pctMatch[1]);
+          ctx.postMessage({ command: 'flashProgress', percent: Math.round(pct), label: `Writing... ${pct}%` });
+          continue;
+        }
+        if (/erasing flash/i.test(segment)) {
+          ctx.postMessage({ command: 'flashProgress', percent: 0, label: 'Erasing flash...' });
+        }
+        if (/hash of data verified/i.test(segment)) {
+          ctx.postMessage({ command: 'flashProgress', percent: 100, label: 'Verifying...' });
+        }
+      }
+    };
+
+    child.stdout.on('data', (d: Buffer) => handleChunk(d.toString()));
+    child.stderr.on('data', (d: Buffer) => handleChunk(d.toString()));
+    child.on('close', (code) => { code === 0 ? resolve() : reject(new Error(`esptool exited with code ${code}`)); });
+    child.on('error', reject);
+  });
+}
+
+/**
  * Handles firmware flashing triggered from the webview (web download).
  * Supports UF2 (RP boards) and .bin (ESP32) formats.
  */
@@ -143,31 +177,23 @@ export async function handleFlashFromWeb(ctx: HandlerContext, firmwareUrl: strin
   } else {
     const esptoolPath = vscode.workspace.getConfiguration('mp').get<string>('esptoolPath', 'esptool');
     const command = `${esptoolPath} --port ${port} --baud 115200 write_flash --flash_mode keep --flash_size keep --erase-all 0x1000 "${tmpPath}"`;
-    ctx.outputChannel.appendLine(`Executing: ${command}`);
+
+    ctx.postMessage({ command: 'flashStatusUpdate', text: 'start' });
+    ctx.postMessage({ command: 'flashProgress', percent: 0, label: 'Starting...' });
 
     await vscode.window.withProgress(
       { location: vscode.ProgressLocation.Notification, title: 'Flashing firmware...', cancellable: false },
-      () => new Promise<void>((resolve, reject) => {
-        exec(command, (err, stdout, stderr) => {
-          ctx.outputChannel.appendLine('[stdout]');
-          ctx.outputChannel.appendLine(stdout);
-          if (stderr) {
-            ctx.outputChannel.appendLine('[stderr]');
-            ctx.outputChannel.appendLine(stderr);
-          }
-
-          if (err) {
-            vscode.window.showErrorMessage(`Flash failed: ${stderr || err.message}`);
-            reject(err);
-            ctx.postMessage({ command: 'flashStatusUpdate', text: 'error' });
-          } else {
-            vscode.window.showInformationMessage('Flash successful!');
-            resolve();
-            ctx.postMessage({ command: 'flashStatusUpdate', text: 'done' });
-            ctx.postMessage({ command: 'triggerListFiles', port });
-          }
-        });
-      })
+      async () => {
+        try {
+          await streamFlashWithProgress(command, ctx);
+          vscode.window.showInformationMessage('Flash successful!');
+          ctx.postMessage({ command: 'flashStatusUpdate', text: 'done' });
+          ctx.postMessage({ command: 'triggerListFiles', port });
+        } catch (err: any) {
+          vscode.window.showErrorMessage(`Flash failed: ${err.message}`);
+          ctx.postMessage({ command: 'flashStatusUpdate', text: 'error' });
+        }
+      }
     );
   }
 }
@@ -189,26 +215,20 @@ export async function handleFlashFirmware(ctx: HandlerContext, message: any): Pr
   const esptoolPath = vscode.workspace.getConfiguration('mp').get<string>('esptoolPath', 'esptool');
   const cmd = `${esptoolPath} --port ${message.port} --baud 115200 write_flash --flash_mode keep --flash_size keep --erase-all 0x1000 "${firmwarePath}"`;
 
+  ctx.postMessage({ command: 'flashStatusUpdate', text: 'start' });
+  ctx.postMessage({ command: 'flashProgress', percent: 0, label: 'Starting...' });
+
   await vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: 'Flashing firmware...', cancellable: false },
-    () => new Promise<void>((resolve, reject) => {
-      ctx.postMessage({ command: 'flashStatusUpdate', text: 'start' });
-
-      exec(cmd, (error, stdout, stderr) => {
-        console.log('Command:', cmd);
-        console.log('STDOUT:', stdout);
-        console.log('STDERR:', stderr);
-
-        if (error) {
-          vscode.window.showErrorMessage(`Firmware flashing failed: ${stderr || error.message}`);
-          ctx.postMessage({ command: 'flashStatusUpdate', text: 'error' });
-          reject(error);
-        } else {
-          vscode.window.showInformationMessage('Firmware flashed successfully!');
-          ctx.postMessage({ command: 'flashStatusUpdate', text: 'done' });
-          resolve();
-        }
-      });
-    })
+    async () => {
+      try {
+        await streamFlashWithProgress(cmd, ctx);
+        vscode.window.showInformationMessage('Firmware flashed successfully!');
+        ctx.postMessage({ command: 'flashStatusUpdate', text: 'done' });
+      } catch (err: any) {
+        vscode.window.showErrorMessage(`Firmware flashing failed: ${err.message}`);
+        ctx.postMessage({ command: 'flashStatusUpdate', text: 'error' });
+      }
+    }
   );
 }

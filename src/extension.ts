@@ -4,11 +4,11 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
-import { exec } from 'child_process';
 import { SerialPort } from 'serialport';
 
 import { EspFlasherViewProvider } from './EspFlasherProvider';
 import { pickPort } from './utils/portUtils';
+import { execCommand } from './utils/execUtils';
 
 export function activate(context: vscode.ExtensionContext) {
   const provider = new EspFlasherViewProvider(context);
@@ -138,19 +138,15 @@ export function activate(context: vscode.ExtensionContext) {
           await fs.promises.writeFile(tmpPath, doc.getText(), 'utf8');
           out.appendLine(`Uploading buffer - temp: ${tmpPath} - device: ${fname} on ${port}`);
 
-          await new Promise<void>((resolve, reject) => {
-            const cmd = `mpremote connect ${port} fs cp "${tmpPath}" :${saveAsMain ? 'main.py' : `"${fname}"`}`;
-            out.appendLine(`Exec: ${cmd}`);
-            exec(cmd, (err, _o, stderr) => {
-              if (err) {
-                out.appendLine(`[ERROR] Upload failed: ${stderr || err}`);
-                reject(new Error(stderr || String(err)));
-              } else {
-                out.appendLine('Upload successful (device-only).');
-                resolve();
-              }
-            });
-          });
+          const cmd = `mpremote connect ${port} fs cp "${tmpPath}" :${saveAsMain ? 'main.py' : `"${fname}"`}`;
+          out.appendLine(`Exec: ${cmd}`);
+          try {
+            await execCommand(cmd, out);
+            out.appendLine('Upload successful (device-only).');
+          } catch (err: any) {
+            out.appendLine(`[ERROR] Upload failed: ${err.message}`);
+            throw err;
+          }
 
           vscode.window.showInformationMessage(`Saved to device (${fname}).`);
           provider.refreshFileListOnDevice(port);
@@ -164,19 +160,15 @@ export function activate(context: vscode.ExtensionContext) {
         const deviceName = saveAsMain ? 'main.py' : path.basename(localPath);
         out.appendLine(`Uploading disk file: ${localPath} - device: ${deviceName} on ${port}`);
 
-        await new Promise<void>((resolve, reject) => {
-          const cmd = `mpremote connect ${port} fs cp "${localPath}" :${saveAsMain ? 'main.py' : `"${deviceName}"`}`;
-          out.appendLine(`Exec: ${cmd}`);
-          exec(cmd, (err, _o, stderr) => {
-            if (err) {
-              out.appendLine(`[ERROR] Upload failed: ${stderr || err}`);
-              reject(new Error(stderr || String(err)));
-            } else {
-              out.appendLine('Upload successful (pc/both).');
-              resolve();
-            }
-          });
-        });
+        const cmd2 = `mpremote connect ${port} fs cp "${localPath}" :${saveAsMain ? 'main.py' : `"${deviceName}"`}`;
+        out.appendLine(`Exec: ${cmd2}`);
+        try {
+          await execCommand(cmd2, out);
+          out.appendLine('Upload successful (pc/both).');
+        } catch (err: any) {
+          out.appendLine(`[ERROR] Upload failed: ${err.message}`);
+          throw err;
+        }
 
         vscode.window.showInformationMessage(`Uploaded to device (${deviceName}).`);
         provider.refreshFileListOnDevice(port);
