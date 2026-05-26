@@ -1,172 +1,141 @@
 # Soldered MicroPython Helper
 
-⚠️ **Experimental Extension**  
-Use at your own risk. This extension is actively being developed.
+A MicroPython-focused extension for Visual Studio Code designed for working with ESP and RP2-based boards. Flash firmware, upload scripts, monitor serial output, and fetch Soldered libraries — all from within the editor.
 
-[VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=SolderedElectronics.soldered-micropython-helper&ssr=false)
+> **Note:** This extension is actively developed. Report issues on [GitHub](https://github.com/SolderedElectronics/Soldered-MicroPython-Helper/issues).
 
-A MicroPython-focused helper for working with ESP-based boards directly inside Visual Studio Code.  
-Flash firmware, upload scripts, monitor serial output, and fetch Soldered libraries — all in one place.
+[Install from VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=SolderedElectronics.soldered-micropython-helper)
 
 ---
 
-## ✨ What’s New
+## Requirements
 
-- **RP2040 & RP2350 support** — including UF2 flashing flows for supported boards.
-- **Minor visual overhaul** — cleaner layout and controls.
-- **Improved saving options** — optional *auto-save to both PC and device* on file save.  
-  You can turn this on/off in **File → Preferences → Settings** and search for **“MicroPython Tools”**.
-- **Smarter actions** — better automatic behavior when selecting ports and managing files.
-- **Upload a whole folder** — pick a directory and upload all `.py` files (recursively, including subfolders) to the device in one go.
-
----
-
-## 🚀 Quick Setup (Required for Extension to Work)
-
-Run the following commands in your terminal:
+Before using this extension, install the required Python tools:
 
 ```bash
-# Install required Python tools
 pip install esptool mpremote
 ```
 
-Make sure:
-- Your Python executables (`esptool` and `mpremote`) are in your system `PATH`
-- You have permission to access serial ports (see below)
+Both `esptool` and `mpremote` must be accessible on your system `PATH`.
+
+### Serial port access
+
+**Linux:** If your board does not appear in the port list, run this once to grant your account access to serial ports:
+
+```bash
+sudo usermod -a -G dialout $USER
+```
+
+Then **log out and log back in**. After that, the extension can communicate with your board.
+
+**macOS:** No extra steps needed. If your board does not appear in the port list, you may need to install a USB-Serial driver for your board's chip:
+
+- [CP210x driver](https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers) — used by most ESP32 boards
+- [CH340 driver](https://www.wch-ic.com/downloads/CH341SER_MAC_ZIP.html) — used by some cheaper boards
+
+After installing the driver, replug your board.
+
+**Windows:** If no ports appear, try running VS Code as Administrator.
 
 ---
 
-## 🔍 How to Find and Install in VS Code
+## Features
 
-1. Open **Visual Studio Code**
-2. Go to the **Extensions** tab (or press `Ctrl+Shift+X`)
-3. Search for: `Soldered MicroPython Helper`
-4. Click **Install**
-
-Or [install it directly from the VS Code Marketplace →](https://marketplace.visualstudio.com/items?itemName=SolderedElectronics.soldered-micropython-helper&ssr=false)
-
----
-
-## 🔧 Features
-
-- Flash firmware to boards (via `esptool.py`)
-- Upload and delete `.py` files (via `mpremote`)
+- Flash MicroPython firmware to ESP and RP2-based boards
+- Upload, run, and delete `.py` files on the device
 - Live serial output monitoring
-- Fetch libraries and examples from Soldered's GitHub
-- Auto-detect serial ports and show device files
+- Open and edit files directly from the device
+- Fetch Soldered libraries and examples from GitHub
+- Auto-detect connected serial ports
 
 ---
 
-## ⚙️ Full Setup Instructions
+## Installation
 
-### Requirements
+1. Open Visual Studio Code.
+2. Go to the Extensions panel (`Ctrl+Shift+X`).
+3. Search for `Soldered MicroPython Helper`.
+4. Click **Install**.
 
-1. **Python 3.x** — [Download](https://www.python.org/downloads/)
-2. **Visual Studio Code** — [Download](https://code.visualstudio.com/)
-
-### Python packages (required globally or in your active environment):
-
-```bash
-pip install esptool mpremote
-```
+Alternatively, [install directly from the Marketplace](https://marketplace.visualstudio.com/items?itemName=SolderedElectronics.soldered-micropython-helper).
 
 ---
 
-## ⚠️ Warning: Avoid Infinite Loops Without Delay
+## Usage
 
-When writing MicroPython code — especially when using `while True` loops — it's **critical to include a `sleep()` or other delay inside the loop**. This is standard practice to avoid common issues such as:
+### Selecting a port
 
-- **CPU overload** — the loop runs thousands of times per second without pause
-- **Unreadable output** — serial prints become too fast to read
-- **Poor device responsiveness** — the device may become unresponsive or glitchy
-- **Unnecessary power consumption**
+<!-- IMAGE: port selection dropdown screenshot -->
 
-### ✅ Recommended pattern:
+Select your board's serial port from the COM Port dropdown. Buttons requiring a connected device are disabled until a port is selected.
+
+### Flashing firmware
+
+<!-- IMAGE: firmware flash section screenshot -->
+
+Select your board from the grouped dropdown and click **Flash**. The extension fetches the latest official MicroPython firmware automatically.
+
+### Uploading files
+
+<!-- IMAGE: upload section screenshot -->
+
+Upload the currently open file, any `.py` file from your PC, or an entire folder. Files can be run directly on the device and stopped at any time.
+
+### Managing files on the device
+
+<!-- IMAGE: file list screenshot -->
+
+List files currently on the device. Select a file to open, run, or delete it. Files opened from the device are downloaded to a temporary location and can be edited in the editor.
+
+### Installing Soldered modules
+
+<!-- IMAGE: module section screenshot -->
+
+Browse modules by category and select a module from the dropdown. Install the library, examples, or both with a single click.
+
+### Serial monitor
+
+<!-- IMAGE: serial monitor output screenshot -->
+
+Open the serial monitor to stream device output to the VS Code output panel. The monitor closes automatically when uploading or running files.
+
+---
+
+## Notes on MicroPython code
+
+Always include a delay inside `while True` loops. Without one, the device may become unresponsive and output becomes unreadable.
 
 ```python
 from time import sleep
 
 while True:
-    sleep(0.5)  # Add delay between iterations
-    print("Doing something...")
-```
-
-Here's a real-world example from APDS9960 gesture detection:
-
-```python
-while True:
     sleep(0.5)
-    if apds.isGestureAvailable():
-        motion = apds.readGesture()
-        print("Gesture={}".format(dirs.get(motion, "unknown")))
+    print("Running...")
 ```
-
-🧠 **Tip**: You can adjust the delay based on sensor type or application needs — just make sure *some* delay is present in every infinite loop.
 
 ---
 
-## 🛠 Other Notes
+## Developer Setup
 
-- On Linux/macOS, you may need to add your user to the `dialout` or `uucp` group:
-  ```bash
-  sudo usermod -a -G dialout $USER
-  ```
-  Then log out and back in.
+### Prerequisites
 
-- On Windows, try running VS Code as Administrator if ports don’t show up.
+- [Node.js](https://nodejs.org/) and `npm`
+- [Python 3.x](https://www.python.org/)
+- Native build tools for the `serialport` package:
+  - **Windows:** `npm install --global --production windows-build-tools`
+  - **macOS:** `xcode-select --install`
+  - **Linux:** `sudo apt-get install build-essential python3-dev`
 
----
-
-After completing the above, your VS Code extension should be able to access serial ports and run `esptool` and `mpremote` commands correctly.
-
----
-
-## 🧪 For Developers
-
-If you'd like to contribute or modify this extension locally, follow these steps:
-
-### 1. Install dependencies
-Make sure you have [Node.js](https://nodejs.org/), `npm`, and [Python 3.x](https://www.python.org/) installed.
-
-To use the `serialport` Node.js library, native build tools must be installed:
-
-- **Windows:**
-  ```bash
-  npm install --global --production windows-build-tools
-  ```
-
-- **macOS:**
-  ```bash
-  xcode-select --install
-  ```
-
-- **Linux:**
-  ```bash
-  sudo apt-get install build-essential python3-dev
-  ```
-
-Then, install `serialport`:
+### Build
 
 ```bash
-npm install serialport
-```
-
-Python packages (required globally or in your active environment):
-
-```bash
-pip install esptool mpremote
-```
-
-### 2. Build the extension
-```bash
+npm install
 npm run vscode:prepublish
 ```
 
-### 3. Launch in VS Code
+### Run locally
 
-- Open the project folder in VS Code.
-- Press `F5` to open a new Extension Development Host window.
-- The extension will load there and can be tested as if it were installed.
+Open the project in VS Code and press `F5` to launch an Extension Development Host with the extension loaded.
 
 ---
 
@@ -174,7 +143,7 @@ npm run vscode:prepublish
 
 <img src="https://raw.githubusercontent.com/e-radionicacom/Soldered-Generic-Arduino-Library/dev/extras/Soldered-logo-color.png" alt="soldered-logo" width="500"/>
 
-At Soldered, we design and manufacture a wide selection of electronic products to help you turn your ideas into acts and bring you one step closer to your final project. Our products are intented for makers and crafted in-house by our experienced team in Osijek, Croatia. We believe that sharing is a crucial element for improvement and innovation, and we work hard to stay connected with all our makers regardless of their skill or experience level. Therefore, all our products are open-source. Finally, we always have your back. If you face any problem concerning either your shopping experience or your electronics project, our team will help you deal with it, offering efficient customer service and cost-free technical support anytime. Some of those might be useful for you:
+At Soldered, we design and manufacture a wide selection of electronic products to help you turn your ideas into acts and bring you one step closer to your final project. Our products are intended for makers and crafted in-house by our experienced team in Osijek, Croatia. We believe that sharing is a crucial element for improvement and innovation, and we work hard to stay connected with all our makers regardless of their skill or experience level. Therefore, all our products are open-source. Finally, we always have your back. If you face any problem concerning either your shopping experience or your electronics project, our team will help you deal with it, offering efficient customer service and cost-free technical support anytime. Some of those might be useful for you:
 
 - [Web Store](https://www.soldered.com/shop)
 - [Tutorials & Projects](https://soldered.com/learn)
@@ -184,7 +153,7 @@ At Soldered, we design and manufacture a wide selection of electronic products t
 
 Soldered invests vast amounts of time into hardware & software for these products, which are all open-source. Please support future development by buying one of our products.
 
-Check license details in the LICENSE file. Long story short, use these open-source files for any purpose you want to, as long as you apply the same open-source licence to it and disclose the original source. No warranty - all designs in this repository are distributed in the hope that they will be useful, but without any warranty. They are provided "AS IS", therefore without warranty of any kind, either expressed or implied. The entire quality and performance of what you do with the contents of this repository are your responsibility. In no event, Soldered (TAVU) will be liable for your damages, losses, including any general, special, incidental or consequential damage arising out of the use or inability to use the contents of this repository.
+Check license details in the LICENSE file. Long story short, use these open-source files for any purpose you want to, as long as you apply the same open-source licence to it and disclose the original source. No warranty — all designs in this repository are distributed in the hope that they will be useful, but without any warranty. They are provided "AS IS", therefore without warranty of any kind, either expressed or implied. The entire quality and performance of what you do with the contents of this repository are your responsibility. In no event, Soldered (TAVU) will be liable for your damages, losses, including any general, special, incidental or consequential damage arising out of the use or inability to use the contents of this repository.
 
 ## Have fun!
 
