@@ -8,9 +8,9 @@ import { HandlerContext } from './types';
 import { startSerialMonitor, handleRunPythonFile, handleStopRunningCode } from './handlers/serialHandler';
 import { handleFlashFromWeb, handleFlashFirmware, fetchFirmwareList } from './handlers/flashHandler';
 import { handleListFiles, handleDeleteFile, handleDeleteAllFiles } from './handlers/fileHandler';
-import { handleUploadPython, handleUploadPythonAsIs, handleUploadPythonFromPc, handleOpenFileFromDevice } from './handlers/uploadHandler';
+import { handleUploadPythonAsIs, handleUploadPythonFromPc, handleOpenFileFromDevice } from './handlers/uploadHandler';
 import { handleFetchModule, handleGetCategories, handleGetModulesForCategory, handleGetAllModules } from './handlers/moduleHandler';
-import { execMpremote, execUnqueued } from './utils/execUtils';
+import { execUnqueued } from './utils/execUtils';
 
 const IGNORED_PORT_PATTERNS = ['debug-console', 'Bluetooth-Incoming-Port'];
 
@@ -120,10 +120,6 @@ export class EspFlasherViewProvider implements vscode.WebviewViewProvider {
 
         case 'requestRefresh':
           await this.refreshState();
-          break;
-
-        case 'uploadPython':
-          await handleUploadPython(ctx, message);
           break;
 
         case 'listFiles':

@@ -4,43 +4,26 @@ import * as path from 'path';
 import * as os from 'os';
 import { HandlerContext } from '../types';
 import { execCommand, execMpremote, withRetry } from '../utils/execUtils';
+import { uploadFileToDevice } from '../utils/uploadUtils';
 
 /**
- * Uploads the active editor's Python file to the device as main.py.
+ * Tracks files downloaded from the device so Ctrl+S can upload back
+ * to the correct device path (including subdirectories).
+ * Key: local temp path. Value: { port, devicePath }.
  */
-export async function handleUploadPython(ctx: HandlerContext, message: any): Promise<void> {
-  if (ctx.serialMonitor && ctx.serialMonitor.isOpen) {
-    ctx.outputChannel.appendLine('Stopping serial monitor before proceeding...');
-    ctx.serialMonitor.close();
-    ctx.setSerialMonitor(null);
-  }
+const deviceFileRegistry = new Map<string, { port: string; devicePath: string }>();
 
-  const activeEditor = vscode.window.activeTextEditor;
-  if (!activeEditor || activeEditor.document.languageId !== 'python') {
-    vscode.window.showErrorMessage('No active Python file to upload.');
-    return;
-  }
+export function registerDeviceFile(localPath: string, port: string, devicePath: string): void {
+  deviceFileRegistry.set(localPath, { port, devicePath });
+}
 
-  const filePath = activeEditor.document.fileName;
-  const { port } = message;
-  const uploadCmd = `mpremote connect ${port} fs cp "${filePath}" :main.py`;
-
-  await vscode.window.withProgress(
-    { location: vscode.ProgressLocation.Notification, title: 'Uploading Python file as main.py...', cancellable: false },
-    async () => {
-      try {
-        await withRetry(() => execCommand(uploadCmd, ctx.outputChannel), 5, 500, 'uploadPython', ctx.outputChannel);
-        vscode.window.showInformationMessage('Python file uploaded successfully as main.py!');
-        ctx.postMessage({ command: 'triggerListFiles', port });
-      } catch (err: any) {
-        vscode.window.showErrorMessage(`Upload failed: ${err.message}`);
-      }
-    }
-  );
+export function lookupDeviceFile(localPath: string): { port: string; devicePath: string } | undefined {
+  return deviceFileRegistry.get(localPath);
 }
 
 /**
  * Uploads the active editor's Python file to the device preserving its original filename.
+ * Flushes any unsaved buffer changes to disk first so the device gets the latest content.
  */
 export async function handleUploadPythonAsIs(ctx: HandlerContext, message: any): Promise<void> {
   if (ctx.serialMonitor && ctx.serialMonitor.isOpen) {
@@ -55,20 +38,32 @@ export async function handleUploadPythonAsIs(ctx: HandlerContext, message: any):
     return;
   }
 
-  const filePath = activeEditor.document.fileName;
-  const fileName = filePath.split(/[/\\]/).pop()!;
+  const doc = activeEditor.document;
+
+  if (doc.isUntitled) {
+    vscode.window.showErrorMessage('Save the file locally first before uploading to device.');
+    return;
+  }
+
+  // Flush buffer to disk so the device receives the current editor content
+  if (doc.isDirty) {
+    await vscode.workspace.save(doc.uri);
+  }
+
+  const filePath = doc.fileName;
+  const fileName = path.basename(filePath);
   const { port } = message;
-  const uploadCmd = `mpremote connect ${port} fs cp "${filePath}" :"${fileName}"`;
 
   await vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: `Uploading ${fileName} to device...`, cancellable: false },
     async () => {
       try {
-        await withRetry(() => execCommand(uploadCmd, ctx.outputChannel), 5, 500, `upload:${fileName}`, ctx.outputChannel);
+        await uploadFileToDevice(filePath, `/${fileName}`, port, ctx.outputChannel);
         vscode.window.showInformationMessage(`${fileName} uploaded successfully!`);
         ctx.postMessage({ command: 'triggerListFiles', port });
       } catch (err: any) {
         vscode.window.showErrorMessage(`Upload failed: ${err.message}`);
+        ctx.outputChannel.appendLine(`[ERROR] Upload error: ${err.message}`);
       }
     }
   );
@@ -76,6 +71,7 @@ export async function handleUploadPythonAsIs(ctx: HandlerContext, message: any):
 
 /**
  * Prompts user to pick a single .py file or folder, then uploads to device.
+ * Preserves directory structure relative to the selected folder root.
  */
 export async function handleUploadPythonFromPc(ctx: HandlerContext, message: any): Promise<void> {
   if (ctx.serialMonitor && ctx.serialMonitor.isOpen) {
@@ -166,12 +162,8 @@ export async function handleUploadPythonFromPc(ctx: HandlerContext, message: any
             ctx.outputChannel
           ).catch(() => {});
         }
-        // Upload files preserving relative paths
         for (const { localPath, devicePath } of uploadFiles) {
-          await withRetry(
-            () => execCommand(`mpremote connect ${port} fs cp "${localPath}" :"${devicePath}"`, ctx.outputChannel),
-            5, 500, `upload:${devicePath}`, ctx.outputChannel
-          );
+          await uploadFileToDevice(localPath, devicePath, port, ctx.outputChannel);
         }
         vscode.window.showInformationMessage('All .py files uploaded successfully!');
         ctx.postMessage({ command: 'triggerListFiles', port });
@@ -185,6 +177,7 @@ export async function handleUploadPythonFromPc(ctx: HandlerContext, message: any
 
 /**
  * Downloads a file from the device to a temp location and opens it in the editor.
+ * Registers the device path so Ctrl+S uploads back to the correct location.
  */
 export async function handleOpenFileFromDevice(ctx: HandlerContext, message: any): Promise<void> {
   const { port, filename } = message;
@@ -197,6 +190,9 @@ export async function handleOpenFileFromDevice(ctx: HandlerContext, message: any
     ctx.outputChannel.appendLine(`Downloading ${filename} from device...`);
 
     await withRetry(() => execMpremote(cmd), 5, 500, 'openFile', ctx.outputChannel);
+
+    // Track mapping: local temp path → device path so Ctrl+S uploads back correctly
+    registerDeviceFile(localPath, port, filename);
 
     const doc = await vscode.workspace.openTextDocument(localPath);
     await vscode.window.showTextDocument(doc, { preview: false });

@@ -54,11 +54,6 @@
           "default": true,
           "description": "When saving a Python file, also upload it to the connected MicroPython device (using the last selected port). If disabled, you will be prompted to choose where to save the file (PC, device, or both)."
         },
-        "mp.alsoSaveLocally": {
-          "type": "boolean",
-          "default": false,
-          "description": "When uploading to device on save, also save the file locally to disk."
-        },
         "mp.savePromptMode": {
           "type": "string",
           "enum": [

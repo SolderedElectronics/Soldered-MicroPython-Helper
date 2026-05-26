@@ -2,13 +2,10 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import * as os from 'os';
-import * as fs from 'fs';
-import { SerialPort } from 'serialport';
 
 import { EspFlasherViewProvider } from './EspFlasherProvider';
-import { pickPort } from './utils/portUtils';
-import { execCommand } from './utils/execUtils';
+import { uploadFileToDevice } from './utils/uploadUtils';
+import { lookupDeviceFile } from './handlers/uploadHandler';
 
 export function activate(context: vscode.ExtensionContext) {
   const provider = new EspFlasherViewProvider(context);
@@ -19,182 +16,99 @@ export function activate(context: vscode.ExtensionContext) {
 
   const out = provider.getOutputChannel();
 
-  // Narrowed save targets
-  type SaveMode = 'pc' | 'device' | 'both';
-  type SavePromptMode = 'ask' | SaveMode;
-
-  /**
-   * Resolves the final SaveMode from extension settings.
-   * - If "save to device on save" is enabled, optionally also save locally.
-   * - Otherwise respects "savePromptMode" (and prompts if "ask").
-   */
-  const resolveSaveMode = async (cfg: vscode.WorkspaceConfiguration): Promise<SaveMode> => {
-    const saveToDeviceOnSave = cfg.get<boolean>('mp.saveToDeviceOnSave', true);
-    const alsoSaveLocally    = cfg.get<boolean>('mp.alsoSaveLocally', false);
-
-    if (saveToDeviceOnSave) {
-      return alsoSaveLocally ? 'both' : 'device';
-    }
-
-    let m = cfg.get<SavePromptMode>('mp.savePromptMode', 'ask');
-    if (m === 'ask') {
-      const pick = await vscode.window.showQuickPick(
-        [
-          { label: 'Save to PC',     value: 'pc'     as const },
-          { label: 'Save to device', value: 'device' as const },
-          { label: 'Save to both',   value: 'both'   as const },
-        ],
-        { placeHolder: 'Where do you want to save this .py?' }
-      );
-      if (!pick) throw new Error('cancelled');
-      return pick.value;
-    }
-
-    return m;
-  };
-
   /**
    * Command: mp.savePython
    * Triggered by Ctrl+S / Cmd+S on Python files.
-   * Saves to PC, device, or both based on settings.
+   *
+   * Flow:
+   *  1. Always save to disk first — PC always has the latest version.
+   *  2. If a device port is selected and upload is configured, upload to device.
+   *     - If file was opened from device, uploads back to its original device path.
+   *     - If no port is connected, falls back silently to PC-only with status bar hint.
    */
   context.subscriptions.push(
     vscode.commands.registerCommand('mp.savePython', async () => {
       out.appendLine('mp.savePython invoked');
-      out.show(true);
 
-      const editor0 = vscode.window.activeTextEditor;
-      if (!editor0 || editor0.document.languageId !== 'python') {
-        out.appendLine('No Python editor active - falling back to normal save');
+      const editor = vscode.window.activeTextEditor;
+      if (!editor || editor.document.languageId !== 'python') {
         await vscode.commands.executeCommand('workbench.action.files.save');
         return;
       }
 
-      const cfg        = vscode.workspace.getConfiguration();
-      const saveAsMain = cfg.get<boolean>('mp.saveDeviceAsMain', false);
+      const cfg              = vscode.workspace.getConfiguration();
+      const saveToDevice     = cfg.get<boolean>('mp.saveToDeviceOnSave', true);
+      const saveAsMain       = cfg.get<boolean>('mp.saveDeviceAsMain', false);
+      const savePromptMode   = cfg.get<string>('mp.savePromptMode', 'ask');
 
-      let mode: SaveMode;
-      try {
-        mode = await resolveSaveMode(cfg);
-        out.appendLine(`Resolved save mode: ${mode}`);
-      } catch (e) {
-        const msg = (e as Error).message;
-        if (msg === 'cancelled') {
-          out.appendLine('User cancelled save mode quick pick.');
-          return;
+      let doc = editor.document;
+
+      // Step 1: Always save to disk
+      if (doc.isUntitled) {
+        const uri = await vscode.window.showSaveDialog({ filters: { Python: ['py'] } });
+        if (!uri) { return; }
+        await vscode.workspace.fs.writeFile(uri, Buffer.from(doc.getText(), 'utf8'));
+        const diskDoc = await vscode.workspace.openTextDocument(uri);
+        await vscode.window.showTextDocument(diskDoc, { preview: false });
+        doc = diskDoc;
+      } else {
+        await vscode.commands.executeCommand('workbench.action.files.save');
+        doc = vscode.window.activeTextEditor?.document || doc;
+      }
+      out.appendLine(`Saved to disk: ${doc.fileName}`);
+
+      // Step 2: Decide whether to upload to device
+      let shouldUpload = false;
+      if (saveToDevice) {
+        shouldUpload = true;
+      } else {
+        let mode = savePromptMode;
+        if (mode === 'ask') {
+          // File is already on disk — only ask about device upload
+          const pick = await vscode.window.showQuickPick(
+            [
+              { label: 'PC only',               description: 'Already saved to disk', value: 'pc'     },
+              { label: 'Also upload to device',                                        value: 'device' },
+            ],
+            { placeHolder: 'File saved to PC — also upload to connected device?' }
+          );
+          if (!pick) { return; }
+          mode = (pick as any).value;
         }
-        vscode.window.showErrorMessage(`Save error: ${msg}`);
-        out.appendLine(`[ERROR] Resolve mode error: ${msg}`);
+        shouldUpload = (mode === 'device' || mode === 'both');
+      }
+
+      if (!shouldUpload) {
+        vscode.window.setStatusBarMessage('Saved to PC', 1500);
         return;
       }
 
-      let doc = editor0.document;
+      // Step 3: Get port — no disruptive prompt; fall back silently if missing
+      const port = context.globalState.get<string>('mp.lastPort');
+      if (!port) {
+        vscode.window.setStatusBarMessage('Saved locally — no device connected', 3000);
+        out.appendLine('[INFO] No port selected — saved to PC only.');
+        return;
+      }
 
-      /**
-       * Ensures the file is persisted to disk.
-       * For untitled files: prompts Save As.
-       * For titled files: triggers normal save.
-       */
-      const ensureOnDisk = async (): Promise<boolean> => {
-        if (doc.isUntitled) {
-          out.appendLine('Document is untitled - prompting for save location...');
-          const uri = await vscode.window.showSaveDialog({ filters: { Python: ['py'] } });
-          if (!uri) {
-            out.appendLine('User cancelled Save Dialog.');
-            return false;
-          }
-          await vscode.workspace.fs.writeFile(uri, Buffer.from(doc.getText(), 'utf8'));
-          const diskDoc = await vscode.workspace.openTextDocument(uri);
-          await vscode.window.showTextDocument(diskDoc, { preview: false });
-          out.appendLine(`Saved untitled doc to: ${uri.fsPath}`);
-        } else {
-          out.appendLine(`Saving to disk: ${doc.fileName}`);
-          await vscode.commands.executeCommand('workbench.action.files.save');
-        }
+      // Step 4: Determine device path
+      // Files opened from device have a registered path that preserves their subdirectory
+      const deviceInfo = lookupDeviceFile(doc.fileName);
+      const devicePath = deviceInfo
+        ? deviceInfo.devicePath
+        : saveAsMain ? '/main.py' : '/' + path.basename(doc.fileName);
 
-        const ed = vscode.window.activeTextEditor;
-        if (!ed) {
-          out.appendLine('[ERROR] No active editor after save.');
-          return false;
-        }
-        doc = ed.document;
-        return true;
-      };
-
-      /**
-       * Uploads the current file/buffer to the device via mpremote.
-       */
-      const uploadToDevice = async () => {
-        const port = await pickPort({ outputChannel: out, extensionContext: context });
-        if (!port) return;
-
-        if (mode === 'device') {
-          const tmpDir  = path.join(os.tmpdir(), 'mp-save');
-          await fs.promises.mkdir(tmpDir, { recursive: true });
-
-          const fname   = saveAsMain ? 'main.py' : (path.basename(doc.fileName || 'code.py') || 'code.py');
-          const tmpPath = path.join(tmpDir, fname);
-
-          await fs.promises.writeFile(tmpPath, doc.getText(), 'utf8');
-          out.appendLine(`Uploading buffer - temp: ${tmpPath} - device: ${fname} on ${port}`);
-
-          const cmd = `mpremote connect ${port} fs cp "${tmpPath}" :${saveAsMain ? 'main.py' : `"${fname}"`}`;
-          out.appendLine(`Exec: ${cmd}`);
-          try {
-            await execCommand(cmd, out);
-            out.appendLine('Upload successful (device-only).');
-          } catch (err: any) {
-            out.appendLine(`[ERROR] Upload failed: ${err.message}`);
-            throw err;
-          }
-
-          vscode.window.showInformationMessage(`Saved to device (${fname}).`);
-          provider.refreshFileListOnDevice(port);
-          return;
-        }
-
-        const ok = await ensureOnDisk();
-        if (!ok) return;
-
-        const localPath  = doc.fileName;
-        const deviceName = saveAsMain ? 'main.py' : path.basename(localPath);
-        out.appendLine(`Uploading disk file: ${localPath} - device: ${deviceName} on ${port}`);
-
-        const cmd2 = `mpremote connect ${port} fs cp "${localPath}" :${saveAsMain ? 'main.py' : `"${deviceName}"`}`;
-        out.appendLine(`Exec: ${cmd2}`);
-        try {
-          await execCommand(cmd2, out);
-          out.appendLine('Upload successful (pc/both).');
-        } catch (err: any) {
-          out.appendLine(`[ERROR] Upload failed: ${err.message}`);
-          throw err;
-        }
-
-        vscode.window.showInformationMessage(`Uploaded to device (${deviceName}).`);
-        provider.refreshFileListOnDevice(port);
-      };
-
-      // Execute the chosen flow
+      // Step 5: Upload
       try {
-        if (mode === 'pc') {
-          const ok = await ensureOnDisk();
-          if (!ok) return;
-          out.appendLine('Done: saved to PC only.');
-          vscode.window.setStatusBarMessage('Saved to PC', 1500);
-
-        } else if (mode === 'device') {
-          await uploadToDevice();
-
-        } else if (mode === 'both') {
-          const ok = await ensureOnDisk();
-          if (!ok) return;
-          await uploadToDevice();
-        }
-
-      } catch (e: any) {
-        const msg = e?.message || String(e);
-        vscode.window.showErrorMessage(`Save error: ${msg}`);
-        out.appendLine(`[ERROR] Save flow error: ${msg}`);
+        await vscode.window.withProgress(
+          { location: vscode.ProgressLocation.Notification, title: 'Uploading to device...', cancellable: false },
+          async () => { await uploadFileToDevice(doc.fileName, devicePath, port, out); }
+        );
+        vscode.window.showInformationMessage(`Uploaded to device (${path.basename(devicePath)}).`);
+        provider.refreshFileListOnDevice(port);
+      } catch (err: any) {
+        vscode.window.showErrorMessage(`Upload failed: ${err.message}`);
+        out.appendLine(`[ERROR] Upload error: ${err.message}`);
       }
     })
   );
