@@ -96,6 +96,7 @@ export async function handleRunPythonFile(ctx: HandlerContext, message: any): Pr
   const child = spawn('mpremote', args, { shell: false });
 
   ctx.setMpRunProc(child);
+  ctx.postMessage({ command: 'runStatus', running: true, filename });
 
   child.stdout.on('data', (data: Buffer) => {
     ctx.outputChannel.append(data.toString('utf-8'));
@@ -106,11 +107,13 @@ export async function handleRunPythonFile(ctx: HandlerContext, message: any): Pr
   child.on('close', (code) => {
     ctx.outputChannel.appendLine(`\n[run exited with code ${code ?? 0}]`);
     ctx.setMpRunProc(null);
+    ctx.postMessage({ command: 'runStatus', running: false });
   });
   child.on('error', (err) => {
     vscode.window.showErrorMessage(`Failed to start mpremote run: ${err.message}`);
     ctx.outputChannel.appendLine(`[ERROR] Failed to start mpremote run: ${err.message}`);
     ctx.setMpRunProc(null);
+    ctx.postMessage({ command: 'runStatus', running: false });
   });
 
   vscode.window.showInformationMessage(`${filename} is running. Use "Stop" to interrupt.`);

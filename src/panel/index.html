@@ -341,6 +341,19 @@
     line-height: 14px;
   }
 
+  .tree-file-indicator {
+    display: inline-block;
+    width: 14px;
+    flex-shrink: 0;
+    font-size: 9px;
+    text-align: center;
+    color: var(--vscode-charts-green, #4caf50);
+  }
+
+  .tree-row.tree-running .tree-name {
+    color: var(--vscode-charts-green, #4caf50);
+  }
+
 </style>
 </head>
 
@@ -629,7 +642,7 @@ function renderFileTree(nodes, container, depth) {
 
     } else {
       const toggleSpacer = document.createElement('span');
-      toggleSpacer.style.cssText = 'display:inline-block;width:14px;flex-shrink:0';
+      toggleSpacer.className = 'tree-file-indicator';
       row.appendChild(toggleSpacer);
 
       const label = document.createElement('span');
@@ -939,6 +952,23 @@ window.addEventListener('message', (event) => {
   if (message.command === 'flashStatusUpdate') {
     const state = message.text;
     setFlashingState(state);
+  }
+
+  if (message.command === 'runStatus') {
+    // Clear previous running indicator
+    document.querySelectorAll('#fileTree .tree-running').forEach(el => {
+      el.classList.remove('tree-running');
+      const ind = el.querySelector('.tree-file-indicator');
+      if (ind) ind.textContent = '';
+    });
+    if (message.running && message.filename) {
+      const row = document.querySelector(`#fileTree .tree-row[data-path="${CSS.escape(message.filename)}"]`);
+      if (row) {
+        row.classList.add('tree-running');
+        const ind = row.querySelector('.tree-file-indicator');
+        if (ind) ind.textContent = '▶';
+      }
+    }
   }
 
   if (message.command === 'serialMonitorStatus') {
