@@ -6,6 +6,15 @@ import * as https from 'https';
 import * as cheerio from 'cheerio';
 import { exec, spawn } from 'child_process';
 import { HandlerContext } from '../types';
+import { mpremoteQueue } from '../utils/execUtils';
+
+/**
+ * Returns the correct flash start address for the given firmware filename.
+ * ESP32-C2/C3/C6 and S3 use 0x0; original ESP32 and S2 use 0x1000.
+ */
+function getFlashAddress(firmwareName: string): string {
+  return /esp32[_-].*(c2|c3|c6|s3)/i.test(firmwareName) ? '0x0' : '0x1000';
+}
 
 /**
  * Downloads a file from HTTPS URL to a local destination path.
@@ -132,6 +141,14 @@ function streamFlashWithProgress(command: string, ctx: HandlerContext): Promise<
  * Supports UF2 (RP boards) and .bin (ESP32) formats.
  */
 export async function handleFlashFromWeb(ctx: HandlerContext, firmwareUrl: string, port: string): Promise<void> {
+  if (ctx.serialMonitor && ctx.serialMonitor.isOpen) {
+    ctx.outputChannel.appendLine('Stopping serial monitor before flashing...');
+    ctx.serialMonitor.close();
+    ctx.setSerialMonitor(null);
+  }
+  mpremoteQueue.abort();
+  await new Promise(r => setTimeout(r, 500)); // let OS release the port
+
   const firmwareName = path.basename(firmwareUrl);
   const tmpPath = path.join(os.tmpdir(), firmwareName);
   const isUF2 = firmwareUrl.endsWith('.uf2');
@@ -176,7 +193,8 @@ export async function handleFlashFromWeb(ctx: HandlerContext, firmwareUrl: strin
 
   } else {
     const esptoolPath = vscode.workspace.getConfiguration('mp').get<string>('esptoolPath', 'esptool');
-    const command = `${esptoolPath} --port ${port} --baud 115200 write_flash --flash_mode keep --flash_size keep --erase-all 0x1000 "${tmpPath}"`;
+    const flashAddr = getFlashAddress(firmwareName);
+    const command = `${esptoolPath} --port ${port} --baud 115200 write_flash --flash_mode keep --flash_size keep --erase-all ${flashAddr} "${tmpPath}"`;
 
     ctx.postMessage({ command: 'flashStatusUpdate', text: 'start' });
     ctx.postMessage({ command: 'flashProgress', percent: 0, label: 'Starting...' });
@@ -188,6 +206,8 @@ export async function handleFlashFromWeb(ctx: HandlerContext, firmwareUrl: strin
           await streamFlashWithProgress(command, ctx);
           vscode.window.showInformationMessage('Flash successful!');
           ctx.postMessage({ command: 'flashStatusUpdate', text: 'done' });
+          // wait for board to finish booting before listing files
+          await new Promise(r => setTimeout(r, 3000));
           ctx.postMessage({ command: 'triggerListFiles', port });
         } catch (err: any) {
           vscode.window.showErrorMessage(`Flash failed: ${err.message}`);
@@ -202,6 +222,14 @@ export async function handleFlashFromWeb(ctx: HandlerContext, firmwareUrl: strin
  * Handles flashing a locally selected .bin firmware file.
  */
 export async function handleFlashFirmware(ctx: HandlerContext, message: any): Promise<void> {
+  if (ctx.serialMonitor && ctx.serialMonitor.isOpen) {
+    ctx.outputChannel.appendLine('Stopping serial monitor before flashing...');
+    ctx.serialMonitor.close();
+    ctx.setSerialMonitor(null);
+  }
+  mpremoteQueue.abort();
+  await new Promise(r => setTimeout(r, 500)); // let OS release the port
+
   const fileUri = await vscode.window.showOpenDialog({
     filters: { 'BIN files': ['bin'] },
     canSelectMany: false,
@@ -213,7 +241,8 @@ export async function handleFlashFirmware(ctx: HandlerContext, message: any): Pr
 
   const firmwarePath = fileUri[0].fsPath;
   const esptoolPath = vscode.workspace.getConfiguration('mp').get<string>('esptoolPath', 'esptool');
-  const cmd = `${esptoolPath} --port ${message.port} --baud 115200 write_flash --flash_mode keep --flash_size keep --erase-all 0x1000 "${firmwarePath}"`;
+  const flashAddr = getFlashAddress(path.basename(firmwarePath));
+  const cmd = `${esptoolPath} --port ${message.port} --baud 115200 write_flash --flash_mode keep --flash_size keep --erase-all ${flashAddr} "${firmwarePath}"`;
 
   ctx.postMessage({ command: 'flashStatusUpdate', text: 'start' });
   ctx.postMessage({ command: 'flashProgress', percent: 0, label: 'Starting...' });
