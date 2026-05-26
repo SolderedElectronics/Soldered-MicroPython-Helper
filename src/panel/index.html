@@ -489,6 +489,12 @@
 
     <!-- Serial Monitor -->
     <button id="serialMonitorBtn" title="Start/Stop Serial Monitor">Serial Monitor</button>
+    <div id="serialSendRow" style="display:none; margin-top:6px; margin-bottom:6px;">
+      <div style="display:flex; gap:6px; align-items:center;">
+        <input type="text" id="serialSendInput" placeholder="Send data to board..." style="flex:1; margin-bottom:0;" />
+        <button id="serialSendBtn" style="width:auto; margin:0; padding:4px 10px; flex-shrink:0;">Send</button>
+      </div>
+    </div>
 
     <!-- Delete Selected + Delete All -->
     <div class="buttons-row">
@@ -796,6 +802,12 @@ window.addEventListener('focus', () => {
 
 // Serial Monitor Button
 let serialMonitorActive = false;
+let scriptRunning = false;
+
+function updateSendRowVisibility() {
+  const sendRow = document.getElementById('serialSendRow');
+  if (sendRow) sendRow.style.display = (serialMonitorActive || scriptRunning) ? 'block' : 'none';
+}
 
 document.getElementById('serialMonitorBtn').addEventListener('click', () => {
   const port = document.getElementById('port').value;
@@ -805,6 +817,18 @@ document.getElementById('serialMonitorBtn').addEventListener('click', () => {
   } else {
     vscode.postMessage({ command: 'startSerialMonitor', port });
   }
+});
+
+document.getElementById('serialSendBtn').addEventListener('click', () => {
+  const input = document.getElementById('serialSendInput');
+  const port = document.getElementById('port').value;
+  if (!port || !input.value) return;
+  vscode.postMessage({ command: 'sendSerial', port, data: input.value });
+  input.value = '';
+});
+
+document.getElementById('serialSendInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('serialSendBtn').click();
 });
 
 document.getElementById('stopCodeBtn').addEventListener('click', () => {
@@ -955,6 +979,8 @@ window.addEventListener('message', (event) => {
   }
 
   if (message.command === 'runStatus') {
+    scriptRunning = message.running;
+    updateSendRowVisibility();
     // Clear previous running indicator
     document.querySelectorAll('#fileTree .tree-running').forEach(el => {
       el.classList.remove('tree-running');
@@ -975,6 +1001,7 @@ window.addEventListener('message', (event) => {
     serialMonitorActive = message.active;
     const btn = document.getElementById('serialMonitorBtn');
     if (btn) btn.textContent = message.active ? 'Stop Serial Monitor' : 'Serial Monitor';
+    updateSendRowVisibility();
   }
 
   if (message.command === 'micropythonStatus') {

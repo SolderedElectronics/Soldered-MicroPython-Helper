@@ -23,6 +23,7 @@ function filterPorts(ports: { path: string }[]): string[] {
 export class EspFlasherViewProvider implements vscode.WebviewViewProvider {
 
   private mpRunProc: ChildProcess | null = null;
+  private runSerial: SerialPort | null = null;
   private _view?: vscode.WebviewView;
   private outputChannel = vscode.window.createOutputChannel('ESP Output');
   private serialMonitor: SerialPort | null = null;
@@ -42,6 +43,8 @@ export class EspFlasherViewProvider implements vscode.WebviewViewProvider {
       setSerialMonitor: (s: SerialPort | null) => { self.serialMonitor = s; },
       get mpRunProc() { return self.mpRunProc; },
       setMpRunProc: (p: ChildProcess | null) => { self.mpRunProc = p; },
+      get runSerial() { return self.runSerial; },
+      setRunSerial: (s: SerialPort | null) => { self.runSerial = s; },
       extensionContext: this.context,
     };
   }
@@ -217,6 +220,23 @@ export class EspFlasherViewProvider implements vscode.WebviewViewProvider {
           if (ctx.serialMonitor && ctx.serialMonitor.isOpen) {
             ctx.serialMonitor.close();
             ctx.setSerialMonitor(null);
+          }
+          break;
+
+        case 'sendSerial':
+          if (ctx.runSerial && ctx.runSerial.isOpen) {
+            // Raw REPL run: no newline — sys.stdin.read(1) reads exact chars
+            ctx.runSerial.write(message.data, (err) => {
+              if (err) ctx.outputChannel.appendLine(`[ERROR] Serial write failed: ${err.message}`);
+            });
+          } else if (ctx.serialMonitor && ctx.serialMonitor.isOpen) {
+            ctx.serialMonitor.write(message.data + '\n', (err) => {
+              if (err) ctx.outputChannel.appendLine(`[ERROR] Serial write failed: ${err.message}`);
+            });
+          } else if (ctx.mpRunProc?.stdin) {
+            ctx.mpRunProc.stdin.write(message.data + '\n', (err) => {
+              if (err) ctx.outputChannel.appendLine(`[ERROR] stdin write failed: ${err?.message}`);
+            });
           }
           break;
 

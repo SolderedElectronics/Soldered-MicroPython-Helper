@@ -13,5 +13,7 @@ export interface HandlerContext {
   setSerialMonitor(s: SerialPort | null): void;
   readonly mpRunProc: ChildProcess | null;
   setMpRunProc(p: ChildProcess | null): void;
+  readonly runSerial: SerialPort | null;
+  setRunSerial(s: SerialPort | null): void;
   extensionContext: vscode.ExtensionContext;
 }
