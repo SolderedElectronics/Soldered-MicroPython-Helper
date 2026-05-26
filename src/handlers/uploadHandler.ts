@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { HandlerContext } from '../types';
-import { execCommand, execMpremote } from '../utils/execUtils';
+import { execCommand, execMpremote, withRetry } from '../utils/execUtils';
 
 /**
  * Uploads the active editor's Python file to the device as main.py.
@@ -29,7 +29,7 @@ export async function handleUploadPython(ctx: HandlerContext, message: any): Pro
     { location: vscode.ProgressLocation.Notification, title: 'Uploading Python file as main.py...', cancellable: false },
     async () => {
       try {
-        await execCommand(uploadCmd, ctx.outputChannel);
+        await withRetry(() => execCommand(uploadCmd, ctx.outputChannel), 5, 500, 'uploadPython', ctx.outputChannel);
         vscode.window.showInformationMessage('Python file uploaded successfully as main.py!');
         ctx.postMessage({ command: 'triggerListFiles', port });
       } catch (err: any) {
@@ -64,7 +64,7 @@ export async function handleUploadPythonAsIs(ctx: HandlerContext, message: any):
     { location: vscode.ProgressLocation.Notification, title: `Uploading ${fileName} to device...`, cancellable: false },
     async () => {
       try {
-        await execCommand(uploadCmd, ctx.outputChannel);
+        await withRetry(() => execCommand(uploadCmd, ctx.outputChannel), 5, 500, `upload:${fileName}`, ctx.outputChannel);
         vscode.window.showInformationMessage(`${fileName} uploaded successfully!`);
         ctx.postMessage({ command: 'triggerListFiles', port });
       } catch (err: any) {
@@ -112,40 +112,66 @@ export async function handleUploadPythonFromPc(ctx: HandlerContext, message: any
   }
 
   const selectedPath = selection[0].fsPath;
-  const stats = fs.lstatSync(selectedPath);
-  const uploadCommands: string[] = [];
+  const stats = await fs.promises.lstat(selectedPath);
   const { port } = message;
 
+  interface UploadFile { localPath: string; devicePath: string; }
+  const uploadFiles: UploadFile[] = [];
+  const mkdirPaths: string[] = [];
+
   if (stats.isDirectory()) {
-    const walk = (dir: string) => {
-      const entries = fs.readdirSync(dir, { withFileTypes: true });
+    const walk = async (dir: string): Promise<void> => {
+      const entries = await fs.promises.readdir(dir, { withFileTypes: true });
       for (const entry of entries) {
         const fullPath = path.join(dir, entry.name);
         if (entry.isDirectory()) {
-          walk(fullPath);
+          await walk(fullPath);
         } else if (entry.isFile() && entry.name.endsWith('.py')) {
-          const fileName = path.basename(fullPath);
-          uploadCommands.push(`mpremote connect ${port} fs cp "${fullPath}" :"${fileName}"`);
+          const relPath = path.relative(selectedPath, fullPath).replace(/\\/g, '/');
+          uploadFiles.push({ localPath: fullPath, devicePath: '/' + relPath });
         }
       }
     };
-    walk(selectedPath);
+    await walk(selectedPath);
 
-    if (uploadCommands.length === 0) {
+    if (uploadFiles.length === 0) {
       vscode.window.showErrorMessage('Selected folder does not contain any .py files.');
       return;
     }
+
+    // Collect unique device-side parent dirs, shallowest first
+    const dirsSet = new Set<string>();
+    uploadFiles.forEach(({ devicePath }) => {
+      const parts = devicePath.split('/').filter(Boolean);
+      for (let i = 1; i < parts.length; i++) {
+        dirsSet.add('/' + parts.slice(0, i).join('/'));
+      }
+    });
+    mkdirPaths.push(
+      ...Array.from(dirsSet).sort((a, b) => a.split('/').length - b.split('/').length)
+    );
   } else {
-    const fileName = path.basename(selectedPath);
-    uploadCommands.push(`mpremote connect ${port} fs cp "${selectedPath}" :"${fileName}"`);
+    uploadFiles.push({ localPath: selectedPath, devicePath: '/' + path.basename(selectedPath) });
   }
 
   await vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: 'Uploading Python file(s)...', cancellable: false },
     async () => {
       try {
-        for (const cmd of uploadCommands) {
-          await execCommand(cmd, ctx.outputChannel);
+        // Create directories on device (ignore errors — dir may already exist)
+        for (const dir of mkdirPaths) {
+          const b64 = Buffer.from(dir).toString('base64');
+          await execCommand(
+            `mpremote connect ${port} exec "import os,ubinascii; os.mkdir(ubinascii.a2b_base64('${b64}').decode())"`,
+            ctx.outputChannel
+          ).catch(() => {});
+        }
+        // Upload files preserving relative paths
+        for (const { localPath, devicePath } of uploadFiles) {
+          await withRetry(
+            () => execCommand(`mpremote connect ${port} fs cp "${localPath}" :"${devicePath}"`, ctx.outputChannel),
+            5, 500, `upload:${devicePath}`, ctx.outputChannel
+          );
         }
         vscode.window.showInformationMessage('All .py files uploaded successfully!');
         ctx.postMessage({ command: 'triggerListFiles', port });
@@ -163,14 +189,14 @@ export async function handleUploadPythonFromPc(ctx: HandlerContext, message: any
 export async function handleOpenFileFromDevice(ctx: HandlerContext, message: any): Promise<void> {
   const { port, filename } = message;
   const tempDir = path.join(os.tmpdir(), 'esp-temp');
-  const localPath = path.join(tempDir, filename);
+  const localPath = path.join(tempDir, path.basename(filename));
 
   try {
     await fs.promises.mkdir(tempDir, { recursive: true });
     const cmd = `mpremote connect ${port} fs cp :"${filename}" "${localPath}"`;
     ctx.outputChannel.appendLine(`Downloading ${filename} from device...`);
 
-    await execMpremote(cmd);
+    await withRetry(() => execMpremote(cmd), 5, 500, 'openFile', ctx.outputChannel);
 
     const doc = await vscode.workspace.openTextDocument(localPath);
     await vscode.window.showTextDocument(doc, { preview: false });

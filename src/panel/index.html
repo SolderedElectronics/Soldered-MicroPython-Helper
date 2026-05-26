@@ -274,6 +274,73 @@
     background-color: var(--vscode-button-hoverBackground);
   }
 
+  .file-tree {
+    padding: 4px 0;
+  }
+
+  .tree-row {
+    display: flex;
+    align-items: center;
+    padding: 2px 4px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+    min-height: 22px;
+    gap: 2px;
+  }
+
+  .tree-row:hover {
+    background: var(--vscode-list-hoverBackground);
+  }
+
+  .tree-row.selected {
+    background: var(--vscode-list-activeSelectionBackground);
+    color: var(--vscode-list-activeSelectionForeground);
+  }
+
+  .tree-toggle {
+    width: 14px;
+    flex-shrink: 0;
+    font-size: 10px;
+    color: var(--vscode-descriptionForeground);
+    user-select: none;
+    text-align: center;
+  }
+
+  .tree-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin: 0 2px;
+  }
+
+  .tree-children.collapsed {
+    display: none;
+  }
+
+  .tree-actions {
+    display: flex;
+    gap: 3px;
+    flex-shrink: 0;
+    visibility: hidden;
+  }
+
+  .tree-row:hover .tree-actions,
+  .tree-row.selected .tree-actions {
+    visibility: visible;
+  }
+
+  .tree-act-btn {
+    display: inline-block;
+    width: auto;
+    padding: 1px 5px;
+    font-size: 10px;
+    height: auto;
+    margin: 0;
+    line-height: 14px;
+  }
+
 </style>
 </head>
 
@@ -401,7 +468,7 @@
       <button id="stopCodeBtn" title="Stop running code">Stop</button>
     </div>
 
-    <!-- List Files + Open File -->
+    <!-- List Files + Open -->
     <div class="buttons-row">
       <button id="listFilesBtn" title="List files on device">List Files</button>
       <button id="openFileBtn" title="Open selected file from device in editor">Open File from Board</button>
@@ -410,22 +477,29 @@
     <!-- Serial Monitor -->
     <button id="serialMonitorBtn" title="Start/Stop Serial Monitor">Serial Monitor</button>
 
-    <!-- Delete actions -->
+    <!-- Delete Selected + Delete All -->
     <div class="buttons-row">
-      <button id="deleteFileBtn" class="btn-danger" title="Delete selected file from device">Delete Selected File</button>
+      <button id="deleteFileBtn" class="btn-danger" title="Delete selected file or folder">Delete Selected</button>
       <button id="deleteAllFilesBtn" class="btn-danger" title="Delete all files except boot.py and main.py">Delete All Files</button>
     </div>
 
-    <!-- File dropdown list -->
-    <label for="fileSelect">Files on device:</label>
-    <p id="fileListEmpty" style="
-      display: block;
-      font-style: italic;
-      font-size: 0.9em;
-      color: var(--vscode-descriptionForeground);
-      margin: 6px 0;
-    ">No files found — click List Files.</p>
-    <select id="fileSelect" size="12" style="width: 100%; display: none;"></select>
+    <!-- File tree -->
+    <div id="fileTreeContainer" style="
+      background: var(--vscode-input-background);
+      border: 1px solid var(--vscode-input-border);
+      border-radius: 4px;
+      margin-top: 4px;
+    ">
+      <p id="fileListEmpty" style="
+        display: block;
+        font-style: italic;
+        font-size: 0.9em;
+        color: var(--vscode-descriptionForeground);
+        margin: 0;
+        padding: 8px 8px;
+      ">No files found — click List Files.</p>
+      <div id="fileTree" class="file-tree"></div>
+    </div>
 
   </div>
 </div>
@@ -487,6 +561,161 @@
 
 // Gain access to the VS Code Webview API
 const vscode = acquireVsCodeApi();
+
+// Currently selected file path in the tree (null if nothing selected)
+let selectedFilePath = null;
+let selectedFileType = null;
+
+/**
+ * Renders a tree of file/dir nodes into the given container element.
+ * Folders are expanded by default and can be toggled.
+ * Files show Open / Run / Del inline buttons on hover.
+ */
+function renderFileTree(nodes, container, depth) {
+  const getPort = () => document.getElementById('port').value;
+
+  nodes.forEach(node => {
+    const row = document.createElement('div');
+    row.className = 'tree-row';
+    row.dataset.path = node.path;
+    row.dataset.type = node.type;
+
+    if (depth > 0) {
+      const indent = document.createElement('span');
+      indent.style.cssText = `display:inline-block;width:${depth * 16}px;flex-shrink:0`;
+      row.appendChild(indent);
+    }
+
+    if (node.type === 'dir') {
+      const toggle = document.createElement('span');
+      toggle.className = 'tree-toggle';
+      toggle.textContent = '▾';
+      row.appendChild(toggle);
+
+      const label = document.createElement('span');
+      label.className = 'tree-name';
+      label.textContent = '📁 ' + node.name;
+      row.appendChild(label);
+
+      const actions = document.createElement('span');
+      actions.className = 'tree-actions';
+      const delBtn = document.createElement('button');
+      delBtn.className = 'tree-act-btn btn-danger';
+      delBtn.textContent = 'Del';
+      delBtn.title = 'Delete folder recursively';
+      delBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        const port = getPort();
+        if (!port) return;
+        vscode.postMessage({ command: 'deleteFile', port, filename: node.path, type: 'dir' });
+      });
+      actions.appendChild(delBtn);
+      row.appendChild(actions);
+      container.appendChild(row);
+
+      const childrenDiv = document.createElement('div');
+      childrenDiv.className = 'tree-children';
+      container.appendChild(childrenDiv);
+
+      if (node.children && node.children.length > 0) {
+        renderFileTree(node.children, childrenDiv, depth + 1);
+      }
+
+      row.addEventListener('click', e => {
+        if (e.target === delBtn) return;
+        const collapsed = childrenDiv.classList.toggle('collapsed');
+        toggle.textContent = collapsed ? '▶' : '▾';
+      });
+
+    } else {
+      const toggleSpacer = document.createElement('span');
+      toggleSpacer.style.cssText = 'display:inline-block;width:14px;flex-shrink:0';
+      row.appendChild(toggleSpacer);
+
+      const label = document.createElement('span');
+      label.className = 'tree-name';
+      label.textContent = '📄 ' + node.name;
+      row.appendChild(label);
+
+      const actions = document.createElement('span');
+      actions.className = 'tree-actions';
+
+      const openBtn = document.createElement('button');
+      openBtn.className = 'tree-act-btn';
+      openBtn.textContent = 'Open';
+      openBtn.title = 'Open in editor';
+      openBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        const port = getPort();
+        if (!port) return;
+        vscode.postMessage({ command: 'openFileFromDevice', port, filename: node.path });
+      });
+
+      const runBtn = document.createElement('button');
+      runBtn.className = 'tree-act-btn';
+      runBtn.textContent = 'Run';
+      runBtn.title = 'Run on device';
+      runBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        const port = getPort();
+        if (!port) return;
+        vscode.postMessage({ command: 'runPythonFile', port, filename: node.path });
+      });
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'tree-act-btn btn-danger';
+      delBtn.textContent = 'Del';
+      delBtn.title = 'Delete file';
+      delBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        const port = getPort();
+        if (!port) return;
+        vscode.postMessage({ command: 'deleteFile', port, filename: node.path, type: 'file' });
+      });
+
+      actions.appendChild(openBtn);
+      actions.appendChild(runBtn);
+      actions.appendChild(delBtn);
+      row.appendChild(actions);
+
+      row.addEventListener('click', () => {
+        document.querySelectorAll('#fileTree .tree-row.selected').forEach(el => el.classList.remove('selected'));
+        row.classList.add('selected');
+        selectedFilePath = node.path;
+        selectedFileType = 'file';
+        updateButtonStates(getPort());
+      });
+
+      row.addEventListener('dblclick', () => {
+        const port = getPort();
+        if (!port) return;
+        vscode.postMessage({ command: 'openFileFromDevice', port, filename: node.path });
+      });
+
+      container.appendChild(row);
+    }
+  });
+}
+
+/**
+ * Renders tree nodes into #fileTree, showing or hiding the empty message.
+ * Clears current selection.
+ */
+function renderFileTreeUI(nodes) {
+  const treeDiv = document.getElementById('fileTree');
+  const emptyMsg = document.getElementById('fileListEmpty');
+  treeDiv.innerHTML = '';
+  selectedFilePath = null;
+  selectedFileType = null;
+
+  if (!nodes || nodes.length === 0) {
+    emptyMsg.style.display = 'block';
+  } else {
+    emptyMsg.style.display = 'none';
+    renderFileTree(nodes, treeDiv, 0);
+  }
+  updateButtonStates(document.getElementById('port').value);
+}
 
 function formatCacheAge(timestamp) {
   const diffMs = Date.now() - timestamp;
@@ -553,10 +782,16 @@ window.addEventListener('focus', () => {
 });
 
 // Serial Monitor Button
+let serialMonitorActive = false;
+
 document.getElementById('serialMonitorBtn').addEventListener('click', () => {
   const port = document.getElementById('port').value;
   if (!port) return;
-  vscode.postMessage({ command: 'startSerialMonitor', port });
+  if (serialMonitorActive) {
+    vscode.postMessage({ command: 'stopSerialMonitor', port });
+  } else {
+    vscode.postMessage({ command: 'startSerialMonitor', port });
+  }
 });
 
 document.getElementById('stopCodeBtn').addEventListener('click', () => {
@@ -671,7 +906,6 @@ window.addEventListener('message', (event) => {
     if (toSelect) {
       select.value = toSelect;
       vscode.postMessage({ command: 'noop', port: toSelect });
-      vscode.postMessage({ command: 'listFiles', port: toSelect });
       vscode.postMessage({ command: 'checkMicroPython', port: toSelect });
       stopPortScanning();
     } else {
@@ -695,35 +929,22 @@ window.addEventListener('message', (event) => {
     }
   }
 
-  // Show a list of files currently on the device
+  // Show files on the device as a tree
   if (message.command === 'displayFiles') {
-    const fileSelect = document.getElementById('fileSelect');
-    const emptyMsg   = document.getElementById('fileListEmpty');
-    fileSelect.innerHTML = '';
-
-    // Save file list into local state
     currentState.files = message.files;
-
-    if (message.files.length === 0) {
-      emptyMsg.style.display = 'block';
-      fileSelect.style.display = 'none';
-    } else {
-      emptyMsg.style.display = 'none';
-      fileSelect.style.display = '';
-      message.files.forEach(file => {
-        const option = document.createElement('option');
-        option.value = file;
-        option.textContent = file;
-        fileSelect.appendChild(option);
-      });
-    }
-
-    saveState(); // Persist to VS Code state
+    renderFileTreeUI(message.files);
+    saveState();
   }
 
   if (message.command === 'flashStatusUpdate') {
     const state = message.text;
     setFlashingState(state);
+  }
+
+  if (message.command === 'serialMonitorStatus') {
+    serialMonitorActive = message.active;
+    const btn = document.getElementById('serialMonitorBtn');
+    if (btn) btn.textContent = message.active ? 'Stop Serial Monitor' : 'Serial Monitor';
   }
 
   if (message.command === 'micropythonStatus') {
@@ -776,14 +997,6 @@ document.getElementById('listFilesBtn').addEventListener('click', () => {
 });
 
 
-// Delete the selected file from the device
-document.getElementById('deleteFileBtn').addEventListener('click', () => {
-  const port = document.getElementById('port').value;
-  const filename = document.getElementById('fileSelect').value;
-  if (!port || !filename) return;
-  vscode.postMessage({ command: 'deleteFile', port, filename });
-});
-
 // Delete all files from the device (keeps boot.py and main.py)
 document.getElementById('deleteAllFilesBtn').addEventListener('click', () => {
   const port = document.getElementById('port').value;
@@ -798,30 +1011,25 @@ document.getElementById('refreshModulesBtn').addEventListener('click', () => {
   vscode.postMessage({ command: 'getAllModules', force: true });
 });
 
-// Run the selected Python file from the device
+// Run the selected Python file from the device (uses tree selection)
 document.getElementById('runFileBtn').addEventListener('click', () => {
   const port = document.getElementById('port').value;
-  const filename = document.getElementById('fileSelect').value;
-  if (!port || !filename) return;
-  vscode.postMessage({ command: 'runPythonFile', port, filename });
+  if (!port || !selectedFilePath) return;
+  vscode.postMessage({ command: 'runPythonFile', port, filename: selectedFilePath });
 });
 
-// Open File from Board button
+// Open selected file from device in editor
 document.getElementById('openFileBtn').addEventListener('click', () => {
   const port = document.getElementById('port').value;
-  const filename = document.getElementById('fileSelect').value;
-  if (!port || !filename) return;
-  vscode.postMessage({ command: 'openFileFromDevice', port, filename });
+  if (!port || !selectedFilePath) return;
+  vscode.postMessage({ command: 'openFileFromDevice', port, filename: selectedFilePath });
 });
 
-// Double-click on a file to open it in VS Code editor
-document.getElementById('fileSelect').addEventListener('dblclick', () => {
+// Delete selected file or folder
+document.getElementById('deleteFileBtn').addEventListener('click', () => {
   const port = document.getElementById('port').value;
-  const filename = document.getElementById('fileSelect').value;
-  if (!port || !filename) return;
-
-  // Ask extension to download the file to temp and open it
-  vscode.postMessage({ command: 'openFileFromDevice', port, filename });
+  if (!port || !selectedFilePath) return;
+  vscode.postMessage({ command: 'deleteFile', port, filename: selectedFilePath, type: selectedFileType || 'file' });
 });
 
 // Upload a .py file from user's computer to the device
@@ -863,15 +1071,10 @@ function restoreState() {
       });
     }
 
-    // Restore file list
-    const fileSelect = document.getElementById('fileSelect');
-    fileSelect.innerHTML = '';
-    currentState.files.forEach(file => {
-      const option = document.createElement('option');
-      option.value = file;
-      option.textContent = file;
-      fileSelect.appendChild(option);
-    });
+    // Restore file tree
+    if (currentState.files && currentState.files.length > 0) {
+      renderFileTreeUI(currentState.files);
+    }
   }
 
   // Always ask backend to refresh available ports just in case
@@ -895,7 +1098,7 @@ const PORT_DEPENDENT_BTNS = [
 
 // IDs of dropdowns/inputs that require a port
 const PORT_DEPENDENT_INPUTS = [
-  'firmwareSelect', 'categorySelect', 'moduleSelect', 'fileSelect'
+  'firmwareSelect', 'categorySelect', 'moduleSelect'
 ];
 
 function updateButtonStates(port) {
@@ -911,6 +1114,13 @@ function updateButtonStates(port) {
     const el = document.getElementById(id);
     if (el) el.disabled = noPort;
   });
+  // Run / Open / Delete Selected also require a file to be selected in the tree
+  const runBtn = document.getElementById('runFileBtn');
+  if (runBtn) runBtn.disabled = noPort || !selectedFilePath;
+  const openBtn = document.getElementById('openFileBtn');
+  if (openBtn) openBtn.disabled = noPort || !selectedFilePath;
+  const delBtn = document.getElementById('deleteFileBtn');
+  if (delBtn) delBtn.disabled = noPort || !selectedFilePath;
   // moduleSearchInput only enabled if port selected AND modules loaded
   const searchInput = document.getElementById('moduleSearchInput');
   if (searchInput) searchInput.disabled = noPort || !allModulesLoaded;

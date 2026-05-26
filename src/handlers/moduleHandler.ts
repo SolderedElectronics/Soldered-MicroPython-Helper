@@ -206,7 +206,7 @@ export async function handleGetModulesForCategory(ctx: HandlerContext, message: 
 async function uploadDirectoryFiles(url: string, port: string, ctx: HandlerContext): Promise<void> {
   const headers = await githubHeaders();
   const files: any[] = await new Promise((resolve, reject) => {
-    https.get(url, { headers }, res => {
+    const req = https.get(url, { headers }, res => {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
@@ -214,6 +214,7 @@ async function uploadDirectoryFiles(url: string, port: string, ctx: HandlerConte
         catch (e) { reject(e); }
       });
     }).on('error', reject);
+    req.setTimeout(10000, () => req.destroy(new Error('Request timed out')));
   });
 
   const pyFiles = files.filter((f: any) => f.name.endsWith('.py'));
@@ -237,7 +238,7 @@ async function uploadDirectoryFiles(url: string, port: string, ctx: HandlerConte
 async function uploadExamplesWithPicker(url: string, port: string, sensor: string, ctx: HandlerContext): Promise<void> {
   const headers = await githubHeaders();
   const files: any[] = await new Promise((resolve, reject) => {
-    https.get(url, { headers }, res => {
+    const req = https.get(url, { headers }, res => {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
@@ -245,6 +246,7 @@ async function uploadExamplesWithPicker(url: string, port: string, sensor: strin
         catch (e) { reject(e); }
       });
     }).on('error', reject);
+    req.setTimeout(10000, () => req.destroy(new Error('Request timed out')));
   });
 
   const pyFiles = files.filter((f: any) => f.name.endsWith('.py'));
@@ -288,13 +290,11 @@ export async function handleFetchModule(ctx: HandlerContext, message: any): Prom
     return;
   }
 
-  const categories = await fetchCategories();
+  const cached = getCachedModules(ctx);
+  const categories = cached?.categories ?? await fetchCategories();
   const headers = await githubHeaders();
   let baseUrl: string | undefined;
   let flatDownloadUrl: string | undefined; // set only for flat-structure modules (e.g. Qwiic)
-
-  // Use cache to narrow down which category to check first
-  const cached = getCachedModules(ctx);
   const searchCategories: string[] = [];
   if (cached) {
     for (const [cat, mods] of Object.entries(cached.modules)) {
@@ -309,10 +309,13 @@ export async function handleFetchModule(ctx: HandlerContext, message: any): Prom
   for (const category of searchCategories) {
     // Try standard deep path: category/module/module/
     const deepUrl = `${REPO_ROOT}/${category}/${sensor}/${sensor}`;
-    const deepRes: any = await new Promise((resolve) => {
-      https.get(deepUrl, { headers }, resolve).on('error', () => resolve(undefined));
+    const deepStatus: number | undefined = await new Promise((resolve) => {
+      https.get(deepUrl, { headers }, res => {
+        res.resume(); // consume and discard body to free the socket
+        resolve(res.statusCode);
+      }).on('error', () => resolve(undefined));
     });
-    if (deepRes?.statusCode === 200) {
+    if (deepStatus === 200) {
       baseUrl = deepUrl;
       break;
     }

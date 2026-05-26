@@ -43,6 +43,8 @@ After installing the driver, replug your board.
 
 - Flash MicroPython firmware to ESP and RP2-based boards
 - Upload, run, and delete `.py` files on the device
+- Upload entire folders preserving directory structure
+- Browse files and folders on the device in a tree view
 - Live serial output monitoring
 - Open and edit files directly from the device
 - Fetch Soldered libraries and examples from GitHub
@@ -79,13 +81,13 @@ Select your board from the grouped dropdown and click **Flash**. The extension f
 
 <!-- IMAGE: upload section screenshot -->
 
-Upload the currently open file, any `.py` file from your PC, or an entire folder. Files can be run directly on the device and stopped at any time.
+Upload the currently open file, any `.py` file from your PC, or an entire folder. When uploading a folder, the directory structure is preserved on the device — subdirectories are created automatically. Files can be run directly on the device and stopped at any time.
 
 ### Managing files on the device
 
 <!-- IMAGE: file list screenshot -->
 
-List files currently on the device. Select a file to open, run, or delete it. Files opened from the device are downloaded to a temporary location and can be edited in the editor.
+Click **List Files** to browse files and folders on the device in a tree view. Folders are expanded by default and can be collapsed. Hover over any item to reveal inline **Open**, **Run**, and **Del** buttons. Files opened from the device are downloaded to a temporary location and opened in the editor. Deleting a folder removes it and all its contents after confirmation.
 
 ### Installing Soldered modules
 
@@ -113,6 +115,14 @@ while True:
     print("Running...")
 ```
 
+---
+
+## Planned / TODO
+
+- **Drag & drop file upload** — drag `.py` files from your OS file explorer directly into the file tree to upload them to the device
+- **Create folder on device** — add a new folder directly from the panel without uploading a file first
+- **Port rescanning on disconnect** — automatically restart port scanning when a board is unplugged
+- **Extension settings menu**
 ---
 
 ## Developer Setup

@@ -1,0 +1,13 @@
+src/**
+!src/panel/index.html
+node_modules/**
+tsconfig.json
+.eslintrc*
+.prettierrc*
+.gitignore
+.gitattributes
+*.map
+**/*.ts
+!dist/**
+package-lock.json
+*.vsix

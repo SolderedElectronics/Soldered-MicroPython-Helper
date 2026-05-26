@@ -3,26 +3,36 @@
   "displayName": "Soldered MicroPython Helper",
   "publisher": "solderedelectronics",
   "description": "A MicroPython-focused helper for working with ESP-based boards directly inside Visual Studio Code.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "engines": {
-    "vscode": "^1.100.0"
+    "vscode": "^1.85.0"
   },
   "icon": "mp.png",
   "main": "./dist/extension.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SolderedElectronics/Soldered-MicroPython-Helper"
+  },
+  "categories": [
+    "Other",
+    "Programming Languages",
+    "Debuggers"
+  ],
+  "keywords": [
+    "micropython",
+    "esp32",
+    "rp2040",
+    "embedded",
+    "serial",
+    "esptool",
+    "soldered"
+  ],
   "scripts": {
     "vscode:prepublish": "tsc -p ./"
   },
   "activationEvents": [],
   "contributes": {
     "commands": [
-      {
-        "command": "espFlasher.flashFirmware",
-        "title": "Flash Firmware (.bin)"
-      },
-      {
-        "command": "espFlasher.uploadPython",
-        "title": "Upload Python File"
-      },
       {
         "command": "mp.savePython",
         "title": "Save Python (PC or MicroPython device)"
@@ -46,7 +56,7 @@
         },
         "mp.alsoSaveLocally": {
           "type": "boolean",
-          "default": true,
+          "default": false,
           "description": "When uploading to device on save, also save the file locally to disk."
         },
         "mp.savePromptMode": {
@@ -100,7 +110,6 @@
   },
   "dependencies": {
     "cheerio": "^1.1.0",
-    "fuse.js": "^7.1.0",
     "serialport": "^13.0.0"
   }
 }

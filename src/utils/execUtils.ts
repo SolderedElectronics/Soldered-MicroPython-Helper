@@ -78,17 +78,19 @@ export function execCommand(command: string, outputChannel?: OutputChannel): Pro
     const child = spawn('sh', ['-c', command], { detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
     mpremoteQueue.setCurrentProcess(child);
 
+    let stderr = '';
     child.stdout?.on('data', (d: Buffer) => {
       const s = d.toString();
       outputChannel ? outputChannel.appendLine(s.trimEnd()) : console.log(s);
     });
     child.stderr?.on('data', (d: Buffer) => {
       const s = d.toString();
+      stderr += s;
       outputChannel ? outputChannel.appendLine(s.trimEnd()) : console.error(s);
     });
     child.on('close', (code) => {
       mpremoteQueue.setCurrentProcess(null);
-      code === 0 ? resolve() : reject(new Error(`exit code ${code}`));
+      code === 0 ? resolve() : reject(new Error(stderr.trim() || `exit code ${code}`));
     });
     child.on('error', (err) => {
       mpremoteQueue.setCurrentProcess(null);
@@ -133,6 +135,27 @@ export function execMpremote(command: string): Promise<string> {
 }
 
 /**
+ * Executes a shell command outside the queue and returns stdout.
+ * Use for lightweight checks (e.g. checkMicroPython) that must not block the queue.
+ */
+export function execUnqueued(command: string, timeoutMs = 5000): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    const child = spawn('sh', ['-c', command], { detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    let stdout = '';
+    let stderr = '';
+    child.stdout?.on('data', (d: Buffer) => { stdout += d.toString(); });
+    child.stderr?.on('data', (d: Buffer) => { stderr += d.toString(); });
+    const timer = setTimeout(() => { killGroup(child); reject(new Error('timed out')); }, timeoutMs);
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      if (code === 0 || code === null) { resolve(stdout); }
+      else { reject(new Error(stderr.trim() || `exit code ${code}`)); }
+    });
+    child.on('error', (err) => { clearTimeout(timer); reject(err); });
+  });
+}
+
+/**
  * Executes a shell command with a hard timeout.
  * NOT queued — used for time-sensitive stop/reset operations.
  */
@@ -147,6 +170,33 @@ export function execWithTimeout(cmd: string, ms: number): Promise<void> {
     });
     child.on('error', (err) => { clearTimeout(t); reject(err); });
   });
+}
+
+/**
+ * Retries an async function up to `retries` times with `delayMs` between attempts.
+ * Logs each failed non-final attempt to outputChannel.
+ * Throws the last error if all attempts are exhausted.
+ */
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  retries = 5,
+  delayMs = 500,
+  label = 'operation',
+  outputChannel?: OutputChannel
+): Promise<T> {
+  let lastError: Error = new Error('unknown');
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (err: any) {
+      lastError = err;
+      if (attempt < retries) {
+        outputChannel?.appendLine(`[RETRY ${attempt}/${retries}] ${label}: ${err.message}`);
+        await new Promise(r => setTimeout(r, delayMs));
+      }
+    }
+  }
+  throw lastError;
 }
 
 /**

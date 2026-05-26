@@ -4,7 +4,7 @@ import * as os from 'os';
 import { spawn } from 'child_process';
 import { SerialPort } from 'serialport';
 import { HandlerContext } from '../types';
-import { execCommand, execMpremote, execWithTimeout, killProc } from '../utils/execUtils';
+import { execCommand, execMpremote, execWithTimeout, killProc, withRetry } from '../utils/execUtils';
 
 /**
  * Starts the serial monitor on the given port.
@@ -34,9 +34,11 @@ export function startSerialMonitor(ctx: HandlerContext, portPath: string): void 
 
   monitor.on('close', () => {
     ctx.outputChannel.appendLine('Serial monitor closed.');
+    ctx.postMessage({ command: 'serialMonitorStatus', active: false });
   });
 
   ctx.setSerialMonitor(monitor);
+  ctx.postMessage({ command: 'serialMonitorStatus', active: true });
 }
 
 /**
@@ -83,7 +85,7 @@ export async function handleRunPythonFile(ctx: HandlerContext, message: any): Pr
   await vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: `Preparing ${filename}...`, cancellable: false },
     async () => {
-      await execCommand(downloadCmd, ctx.outputChannel);
+      await withRetry(() => execCommand(downloadCmd, ctx.outputChannel), 5, 500, 'runFile-download', ctx.outputChannel);
     }
   );
 

@@ -10,7 +10,7 @@ import { handleFlashFromWeb, handleFlashFirmware, fetchFirmwareList } from './ha
 import { handleListFiles, handleDeleteFile, handleDeleteAllFiles } from './handlers/fileHandler';
 import { handleUploadPython, handleUploadPythonAsIs, handleUploadPythonFromPc, handleOpenFileFromDevice } from './handlers/uploadHandler';
 import { handleFetchModule, handleGetCategories, handleGetModulesForCategory, handleGetAllModules } from './handlers/moduleHandler';
-import { execMpremote } from './utils/execUtils';
+import { execMpremote, execUnqueued } from './utils/execUtils';
 
 const IGNORED_PORT_PATTERNS = ['debug-console', 'Bluetooth-Incoming-Port'];
 
@@ -202,7 +202,8 @@ export class EspFlasherViewProvider implements vscode.WebviewViewProvider {
           break;
 
         case 'checkMicroPython':
-          execMpremote(`mpremote connect ${port} exec "import sys; print(sys.implementation.name)"`)
+          // Run outside the queue — just a lightweight check, must not block other operations
+          execUnqueued(`mpremote connect ${port} exec "import sys; print(sys.implementation.name)"`, 5000)
             .then(stdout => {
               const installed = stdout.trim().toLowerCase().includes('micropython');
               this._view?.webview.postMessage({ command: 'micropythonStatus', installed });
@@ -210,6 +211,13 @@ export class EspFlasherViewProvider implements vscode.WebviewViewProvider {
             .catch(() => {
               this._view?.webview.postMessage({ command: 'micropythonStatus', installed: false });
             });
+          break;
+
+        case 'stopSerialMonitor':
+          if (ctx.serialMonitor && ctx.serialMonitor.isOpen) {
+            ctx.serialMonitor.close();
+            ctx.setSerialMonitor(null);
+          }
           break;
 
         case 'noop':

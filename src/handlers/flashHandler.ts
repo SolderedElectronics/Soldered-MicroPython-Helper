@@ -194,7 +194,7 @@ export async function handleFlashFromWeb(ctx: HandlerContext, firmwareUrl: strin
   } else {
     const esptoolPath = vscode.workspace.getConfiguration('mp').get<string>('esptoolPath', 'esptool');
     const flashAddr = getFlashAddress(firmwareName);
-    const command = `${esptoolPath} --port ${port} --baud 115200 write_flash --flash_mode keep --flash_size keep --erase-all ${flashAddr} "${tmpPath}"`;
+    const command = `${esptoolPath} --port ${port} --baud 115200 write-flash --flash-mode keep --flash-size keep --erase-all ${flashAddr} "${tmpPath}"`;
 
     ctx.postMessage({ command: 'flashStatusUpdate', text: 'start' });
     ctx.postMessage({ command: 'flashProgress', percent: 0, label: 'Starting...' });
@@ -242,7 +242,7 @@ export async function handleFlashFirmware(ctx: HandlerContext, message: any): Pr
   const firmwarePath = fileUri[0].fsPath;
   const esptoolPath = vscode.workspace.getConfiguration('mp').get<string>('esptoolPath', 'esptool');
   const flashAddr = getFlashAddress(path.basename(firmwarePath));
-  const cmd = `${esptoolPath} --port ${message.port} --baud 115200 write_flash --flash_mode keep --flash_size keep --erase-all ${flashAddr} "${firmwarePath}"`;
+  const cmd = `${esptoolPath} --port ${message.port} --baud 115200 write-flash --flash-mode keep --flash-size keep --erase-all ${flashAddr} "${firmwarePath}"`;
 
   ctx.postMessage({ command: 'flashStatusUpdate', text: 'start' });
   ctx.postMessage({ command: 'flashProgress', percent: 0, label: 'Starting...' });
@@ -254,6 +254,8 @@ export async function handleFlashFirmware(ctx: HandlerContext, message: any): Pr
         await streamFlashWithProgress(cmd, ctx);
         vscode.window.showInformationMessage('Firmware flashed successfully!');
         ctx.postMessage({ command: 'flashStatusUpdate', text: 'done' });
+        await new Promise(r => setTimeout(r, 3000));
+        ctx.postMessage({ command: 'triggerListFiles', port: message.port });
       } catch (err: any) {
         vscode.window.showErrorMessage(`Firmware flashing failed: ${err.message}`);
         ctx.postMessage({ command: 'flashStatusUpdate', text: 'error' });
