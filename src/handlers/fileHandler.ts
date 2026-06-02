@@ -4,6 +4,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { HandlerContext } from '../types';
 import { execMpremote, withRetry } from '../utils/execUtils';
+import { closeAllSerial } from './serialHandler';
 
 /**
  * Lists files on the connected MicroPython device as a recursive tree and sends to the webview.
@@ -29,6 +30,8 @@ def tree(p):
     return r
 print(json.dumps(tree('/')))
 `;
+
+  await closeAllSerial(ctx);
 
   const tempPath = path.join(os.tmpdir(), '__list_files__.py');
 
@@ -63,11 +66,7 @@ export async function handleDeleteFile(ctx: HandlerContext, message: any): Promi
     if (confirm !== 'Delete') return;
   }
 
-  if (ctx.serialMonitor && ctx.serialMonitor.isOpen) {
-    ctx.outputChannel.appendLine('Stopping serial monitor before deleting...');
-    ctx.serialMonitor.close();
-    ctx.setSerialMonitor(null);
-  }
+  await closeAllSerial(ctx);
 
   const b64name = Buffer.from(filename).toString('base64');
   const script = `import os, ubinascii
@@ -101,11 +100,7 @@ rm(ubinascii.a2b_base64('${b64name}').decode())
 export async function handleDeleteAllFiles(ctx: HandlerContext, message: any): Promise<void> {
   const { port } = message;
 
-  if (ctx.serialMonitor && ctx.serialMonitor.isOpen) {
-    ctx.outputChannel.appendLine('Stopping serial monitor before deleting...');
-    ctx.serialMonitor.close();
-    ctx.setSerialMonitor(null);
-  }
+  await closeAllSerial(ctx);
 
   const script = `
 import os

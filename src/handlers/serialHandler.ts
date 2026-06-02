@@ -7,14 +7,44 @@ import { HandlerContext } from '../types';
 import { execCommand, execMpremote, execWithTimeout, killProc, withRetry } from '../utils/execUtils';
 
 /**
- * Starts the serial monitor on the given port.
- * Closes any existing monitor first.
+ * Closes all active serial connections (monitor + run serial) and kills any
+ * running mpremote process. Awaits both closes so the OS releases the port
+ * before the caller proceeds.
  */
-export function startSerialMonitor(ctx: HandlerContext, portPath: string): void {
-  if (ctx.serialMonitor) {
-    ctx.serialMonitor.close();
-    ctx.setSerialMonitor(null);
+export async function closeAllSerial(ctx: HandlerContext): Promise<void> {
+  if (ctx.mpRunProc) {
+    try { ctx.mpRunProc.kill(); } catch {}
+    ctx.setMpRunProc(null);
   }
+
+  const closes: Promise<void>[] = [];
+
+  if (ctx.runSerial) {
+    const serial = ctx.runSerial;
+    ctx.setRunSerial(null);
+    ctx.postMessage({ command: 'runStatus', running: false });
+    if (serial.isOpen) {
+      closes.push(new Promise<void>(resolve => serial.close(() => resolve())));
+    }
+  }
+
+  if (ctx.serialMonitor) {
+    const monitor = ctx.serialMonitor;
+    ctx.setSerialMonitor(null);
+    if (monitor.isOpen) {
+      closes.push(new Promise<void>(resolve => monitor.close(() => resolve())));
+    }
+  }
+
+  await Promise.all(closes);
+}
+
+/**
+ * Starts the serial monitor on the given port.
+ * Closes any existing connections first.
+ */
+export async function startSerialMonitor(ctx: HandlerContext, portPath: string): Promise<void> {
+  await closeAllSerial(ctx);
 
   ctx.outputChannel.appendLine(`Opening serial monitor on ${portPath}`);
 
@@ -30,6 +60,8 @@ export function startSerialMonitor(ctx: HandlerContext, portPath: string): void 
 
   monitor.on('error', err => {
     ctx.outputChannel.appendLine(`Serial error: ${err.message}`);
+    if (monitor.isOpen) { monitor.close(() => {}); }
+    ctx.setSerialMonitor(null);
   });
 
   monitor.on('close', () => {
@@ -62,21 +94,7 @@ export function stopSerialMonitorAndReset(ctx: HandlerContext, portPath: string)
  * This gives full bidirectional stdin/stdout — sys.stdin.read() works.
  */
 export async function handleRunPythonFile(ctx: HandlerContext, message: any): Promise<void> {
-  if (ctx.serialMonitor && ctx.serialMonitor.isOpen) {
-    ctx.outputChannel.appendLine('Stopping serial monitor before proceeding...');
-    ctx.serialMonitor.close();
-    ctx.setSerialMonitor(null);
-  }
-
-  if (ctx.mpRunProc) {
-    try { ctx.mpRunProc.kill(); } catch {}
-    ctx.setMpRunProc(null);
-  }
-
-  if (ctx.runSerial && ctx.runSerial.isOpen) {
-    ctx.runSerial.close();
-    ctx.setRunSerial(null);
-  }
+  await closeAllSerial(ctx);
 
   const { filename, port } = message;
   if (!filename || !port) {
@@ -136,12 +154,15 @@ export async function handleRunPythonFile(ctx: HandlerContext, message: any): Pr
 
     serial.on('close', () => {
       clearTimeout(promptTimeout);
+      const scriptFinishedNormally = isDone;
       finish();
       ctx.outputChannel.appendLine('\n[run finished]');
-      setTimeout(() => {
-        startSerialMonitor(ctx, port);
-        ctx.outputChannel.appendLine('Serial monitor reopened.');
-      }, 250);
+      if (scriptFinishedNormally) {
+        setTimeout(() => {
+          startSerialMonitor(ctx, port);
+          ctx.outputChannel.appendLine('Serial monitor reopened.');
+        }, 250);
+      }
     });
 
     serial.on('error', (err: Error) => {
@@ -215,8 +236,8 @@ export async function handleRunPythonFile(ctx: HandlerContext, message: any): Pr
       processRunningData(chunk);
     });
 
-    // Interrupt any running code, then enter raw REPL mode
-    serial.write(Buffer.from([0x03, 0x03, 0x01])); // Ctrl-C, Ctrl-C, Ctrl-A
+    // Interrupt any running code, exit raw REPL if stuck in it, then enter raw REPL
+    serial.write(Buffer.from([0x03, 0x03, 0x02, 0x03, 0x03, 0x01])); // Ctrl-C, Ctrl-C, Ctrl-B, Ctrl-C, Ctrl-C, Ctrl-A
   });
 }
 

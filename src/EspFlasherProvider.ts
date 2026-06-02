@@ -5,12 +5,12 @@ import { SerialPort } from 'serialport';
 import { ChildProcess } from 'child_process';
 
 import { HandlerContext } from './types';
-import { startSerialMonitor, handleRunPythonFile, handleStopRunningCode } from './handlers/serialHandler';
+import { startSerialMonitor, handleRunPythonFile, handleStopRunningCode, closeAllSerial } from './handlers/serialHandler';
 import { handleFlashFromWeb, handleFlashFirmware, fetchFirmwareList } from './handlers/flashHandler';
 import { handleListFiles, handleDeleteFile, handleDeleteAllFiles } from './handlers/fileHandler';
 import { handleUploadPythonAsIs, handleUploadPythonFromPc, handleOpenFileFromDevice } from './handlers/uploadHandler';
 import { handleFetchModule, handleGetCategories, handleGetModulesForCategory, handleGetAllModules } from './handlers/moduleHandler';
-import { execUnqueued } from './utils/execUtils';
+import { execMpremote } from './utils/execUtils';
 
 const IGNORED_PORT_PATTERNS = ['debug-console', 'Bluetooth-Incoming-Port'];
 
@@ -62,6 +62,14 @@ export class EspFlasherViewProvider implements vscode.WebviewViewProvider {
    */
   public getOutputChannel(): vscode.OutputChannel {
     return this.outputChannel;
+  }
+
+  /**
+   * Closes all active serial connections so the port is free for external callers
+   * (e.g. mp.savePython in extension.ts which calls uploadFileToDevice directly).
+   */
+  public async releasePort(): Promise<void> {
+    await closeAllSerial(this.getHandlerContext());
   }
 
   /**
@@ -123,7 +131,7 @@ export class EspFlasherViewProvider implements vscode.WebviewViewProvider {
           break;
 
         case 'listFiles':
-          handleListFiles(ctx, message);
+          await handleListFiles(ctx, message);
           break;
 
         case 'getFirmwareOptions': {
@@ -193,7 +201,7 @@ export class EspFlasherViewProvider implements vscode.WebviewViewProvider {
           break;
 
         case 'deleteFile':
-          handleDeleteFile(ctx, message);
+          await handleDeleteFile(ctx, message);
           break;
 
         case 'deleteAllFiles':
@@ -201,8 +209,8 @@ export class EspFlasherViewProvider implements vscode.WebviewViewProvider {
           break;
 
         case 'checkMicroPython':
-          // Run outside the queue — just a lightweight check, must not block other operations
-          execUnqueued(`mpremote connect ${port} exec "import sys; print(sys.implementation.name)"`, 5000)
+          await closeAllSerial(ctx);
+          execMpremote(`mpremote connect ${port} exec "import sys; print(sys.implementation.name)"`)
             .then(stdout => {
               const installed = stdout.trim().toLowerCase().includes('micropython');
               this._view?.webview.postMessage({ command: 'micropythonStatus', installed });

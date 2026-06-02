@@ -5,6 +5,7 @@ import * as https from 'https';
 import { HandlerContext } from '../types';
 import { execCommand } from '../utils/execUtils';
 import { downloadFile } from './flashHandler';
+import { closeAllSerial } from './serialHandler';
 
 const REPO_ROOT = 'https://api.github.com/repos/SolderedElectronics/Soldered-MicroPython-Modules/contents';
 const FALLBACK_CATEGORIES = ['Sensors', 'Displays', 'Actuators'];
@@ -279,11 +280,7 @@ async function uploadExamplesWithPicker(url: string, port: string, sensor: strin
 export async function handleFetchModule(ctx: HandlerContext, message: any): Promise<void> {
   const { sensor, port, mode } = message;
 
-  if (ctx.serialMonitor && ctx.serialMonitor.isOpen) {
-    ctx.outputChannel.appendLine('Stopping serial monitor before fetching module...');
-    ctx.serialMonitor.close();
-    ctx.setSerialMonitor(null);
-  }
+  await closeAllSerial(ctx);
 
   if (!sensor || !port) {
     vscode.window.showErrorMessage('Module name and port are required.');

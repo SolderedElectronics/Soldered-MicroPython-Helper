@@ -5,6 +5,7 @@ import * as os from 'os';
 import { HandlerContext } from '../types';
 import { execCommand, execMpremote, withRetry } from '../utils/execUtils';
 import { uploadFileToDevice } from '../utils/uploadUtils';
+import { closeAllSerial } from './serialHandler';
 
 /**
  * Tracks files downloaded from the device so Ctrl+S can upload back
@@ -26,11 +27,7 @@ export function lookupDeviceFile(localPath: string): { port: string; devicePath:
  * Flushes any unsaved buffer changes to disk first so the device gets the latest content.
  */
 export async function handleUploadPythonAsIs(ctx: HandlerContext, message: any): Promise<void> {
-  if (ctx.serialMonitor && ctx.serialMonitor.isOpen) {
-    ctx.outputChannel.appendLine('Stopping serial monitor before proceeding...');
-    ctx.serialMonitor.close();
-    ctx.setSerialMonitor(null);
-  }
+  await closeAllSerial(ctx);
 
   const activeEditor = vscode.window.activeTextEditor;
   if (!activeEditor || activeEditor.document.languageId !== 'python') {
@@ -74,11 +71,7 @@ export async function handleUploadPythonAsIs(ctx: HandlerContext, message: any):
  * Preserves directory structure relative to the selected folder root.
  */
 export async function handleUploadPythonFromPc(ctx: HandlerContext, message: any): Promise<void> {
-  if (ctx.serialMonitor && ctx.serialMonitor.isOpen) {
-    ctx.outputChannel.appendLine('Stopping serial monitor before proceeding...');
-    ctx.serialMonitor.close();
-    ctx.setSerialMonitor(null);
-  }
+  await closeAllSerial(ctx);
 
   const choice = await vscode.window.showQuickPick(
     ['Single Python File', 'Folder of Python Files (including subfolders)'],
@@ -180,6 +173,8 @@ export async function handleUploadPythonFromPc(ctx: HandlerContext, message: any
  * Registers the device path so Ctrl+S uploads back to the correct location.
  */
 export async function handleOpenFileFromDevice(ctx: HandlerContext, message: any): Promise<void> {
+  await closeAllSerial(ctx);
+
   const { port, filename } = message;
   const tempDir = path.join(os.tmpdir(), 'esp-temp');
   const localPath = path.join(tempDir, path.basename(filename));

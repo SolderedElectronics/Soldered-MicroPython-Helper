@@ -7,6 +7,7 @@ import * as cheerio from 'cheerio';
 import { exec, spawn } from 'child_process';
 import { HandlerContext } from '../types';
 import { mpremoteQueue } from '../utils/execUtils';
+import { closeAllSerial } from './serialHandler';
 
 /**
  * Returns the correct flash start address for the given firmware filename.
@@ -141,11 +142,7 @@ function streamFlashWithProgress(command: string, ctx: HandlerContext): Promise<
  * Supports UF2 (RP boards) and .bin (ESP32) formats.
  */
 export async function handleFlashFromWeb(ctx: HandlerContext, firmwareUrl: string, port: string): Promise<void> {
-  if (ctx.serialMonitor && ctx.serialMonitor.isOpen) {
-    ctx.outputChannel.appendLine('Stopping serial monitor before flashing...');
-    ctx.serialMonitor.close();
-    ctx.setSerialMonitor(null);
-  }
+  await closeAllSerial(ctx);
   mpremoteQueue.abort();
   await new Promise(r => setTimeout(r, 500)); // let OS release the port
 
@@ -222,11 +219,7 @@ export async function handleFlashFromWeb(ctx: HandlerContext, firmwareUrl: strin
  * Handles flashing a locally selected .bin firmware file.
  */
 export async function handleFlashFirmware(ctx: HandlerContext, message: any): Promise<void> {
-  if (ctx.serialMonitor && ctx.serialMonitor.isOpen) {
-    ctx.outputChannel.appendLine('Stopping serial monitor before flashing...');
-    ctx.serialMonitor.close();
-    ctx.setSerialMonitor(null);
-  }
+  await closeAllSerial(ctx);
   mpremoteQueue.abort();
   await new Promise(r => setTimeout(r, 500)); // let OS release the port
 

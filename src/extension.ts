@@ -7,8 +7,11 @@ import { EspFlasherViewProvider } from './EspFlasherProvider';
 import { uploadFileToDevice } from './utils/uploadUtils';
 import { lookupDeviceFile } from './handlers/uploadHandler';
 
+let activeProvider: EspFlasherViewProvider | undefined;
+
 export function activate(context: vscode.ExtensionContext) {
   const provider = new EspFlasherViewProvider(context);
+  activeProvider = provider;
 
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider('espFlasherWebview', provider)
@@ -100,6 +103,7 @@ export function activate(context: vscode.ExtensionContext) {
 
       // Step 5: Upload
       try {
+        await provider.releasePort();
         await vscode.window.withProgress(
           { location: vscode.ProgressLocation.Notification, title: 'Uploading to device...', cancellable: false },
           async () => { await uploadFileToDevice(doc.fileName, devicePath, port, out); }
@@ -114,4 +118,6 @@ export function activate(context: vscode.ExtensionContext) {
   );
 }
 
-export function deactivate() {}
+export async function deactivate() {
+  await activeProvider?.releasePort();
+}
