@@ -5,7 +5,7 @@
   "description": "A MicroPython-focused helper for working with ESP-based boards directly inside Visual Studio Code.",
   "version": "0.3.0",
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.100.0"
   },
   "icon": "mp.png",
   "main": "./dist/extension.js",

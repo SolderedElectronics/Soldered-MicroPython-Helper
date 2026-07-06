@@ -1,6 +1,5 @@
 src/**
 !src/panel/index.html
-node_modules/**
 tsconfig.json
 .eslintrc*
 .prettierrc*
