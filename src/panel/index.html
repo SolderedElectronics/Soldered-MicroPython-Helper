@@ -6,7 +6,7 @@
 <style>
   body {
     font-family: var(--vscode-font-family);
-    font-size: 13px;
+    font-size: var(--vscode-font-size);
     padding: 12px;
     background-color: var(--vscode-sideBar-background);
     color: var(--vscode-foreground);
@@ -31,7 +31,7 @@
 
   input, select {
     width: 100%;
-    padding: 6px;
+    padding: 4px 6px;
     margin-bottom: 12px;
     border-radius: 4px;
     border: 1px solid var(--vscode-input-border);
@@ -42,19 +42,39 @@
   button {
     display: block;
     width: 100%;
-    padding: 10px 0;
-    margin-top: 10px;
-    margin-bottom: 10px;
+    padding: 4px 8px;
+    margin-top: 6px;
+    margin-bottom: 6px;
     background-color: var(--vscode-button-background);
     color: var(--vscode-button-foreground);
-    font-weight: bold;
-    border: none;
-    border-radius: 6px;
+    font-family: var(--vscode-font-family);
+    font-size: 12px;
+    font-weight: normal;
+    border: 1px solid var(--vscode-button-border, transparent);
+    border-radius: 4px;
     cursor: pointer;
+    text-align: center;
+    line-height: 16px;
   }
 
   button:hover {
     background-color: var(--vscode-button-hoverBackground);
+  }
+
+  button:disabled,
+  input:disabled,
+  select:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .btn-danger {
+    background-color: var(--vscode-statusBarItem-errorBackground);
+    color: var(--vscode-statusBarItem-errorForeground);
+  }
+
+  .btn-danger:hover {
+    filter: brightness(1.15);
   }
 
   .buttons-row {
@@ -62,11 +82,13 @@
     flex-wrap: wrap;
     gap: 10px;
     margin-bottom: 12px;
+    align-items: stretch;
   }
 
   .buttons-row button {
     flex: 1;
     margin-top: 0;
+    margin-bottom: 0;
   }
 
   .section-content {
@@ -115,61 +137,6 @@
     color: var(--vscode-foreground);
   }
 
-  .icon-button-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-    margin: 12px 0;
-  }
-
-  .icon-button {
-    background-color: var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
-    border: none;
-    border-radius: 6px;
-    padding: 8px;
-    width: 100%;
-    aspect-ratio: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background-color 0.2s ease;
-    cursor: pointer;
-  }
-
-  .icon-button:hover {
-    background-color: var(--vscode-button-hoverBackground);
-  }
-
-  .icon-button svg {
-    width: 18px;
-    height: 18px;
-    stroke: currentColor;
-  }
-
-  .icon-button:focus {
-    outline: 2px solid var(--vscode-focusBorder);
-    outline-offset: 2px;
-  }
-
-  .icon-button-row {
-    margin-left: 6px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;            /* tighter spacing */
-    margin-bottom: 5px;
-  }
-  
-  .icon-button-row .icon-button {
-    width: 44px;
-    height: 44px;
-    flex: 0 0 auto;      /* prevent stretching */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 6px;
-    border-radius: 6px;
-  }
 
   #fileSelect {
     margin-top: 10px;
@@ -229,6 +196,64 @@
     box-sizing: border-box;
   }
 
+  .module-search-wrap {
+    position: relative;
+    margin-bottom: 0;
+  }
+
+  #moduleSearchInput {
+    margin-bottom: 0;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  #moduleSuggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--vscode-dropdown-background);
+    border: 1px solid var(--vscode-input-border);
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    max-height: 180px;
+    overflow-y: auto;
+    z-index: 100;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: none;
+  }
+
+  .suggestion-item {
+    padding: 5px 8px;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--vscode-foreground);
+  }
+
+  .suggestion-item:hover {
+    background: var(--vscode-list-activeSelectionBackground);
+    color: var(--vscode-list-activeSelectionForeground);
+  }
+
+  .or-divider {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 12px 0;
+    color: var(--vscode-descriptionForeground);
+    font-size: 0.85em;
+  }
+
+  .or-divider::before,
+  .or-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--vscode-editorGroup-border);
+  }
+
   .port-picker {
     display: inline-flex;
     gap: 8px;
@@ -237,16 +262,96 @@
   #refreshPortsBtn {
     background-color: var(--vscode-button-background);
     color: var(--vscode-button-foreground);
-    border: none;
-    border-radius: 6px;
-    padding: 6px 12px;
-    font-weight: bold;
+    border: 1px solid var(--vscode-button-border, transparent);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-weight: normal;
     cursor: pointer;
     transition: background-color 0.2s ease;
   }
 
   #refreshPortsBtn:hover {
     background-color: var(--vscode-button-hoverBackground);
+  }
+
+  .file-tree {
+    padding: 4px 0;
+  }
+
+  .tree-row {
+    display: flex;
+    align-items: center;
+    padding: 2px 4px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+    min-height: 22px;
+    gap: 2px;
+  }
+
+  .tree-row:hover {
+    background: var(--vscode-list-hoverBackground);
+  }
+
+  .tree-row.selected {
+    background: var(--vscode-list-activeSelectionBackground);
+    color: var(--vscode-list-activeSelectionForeground);
+  }
+
+  .tree-toggle {
+    width: 14px;
+    flex-shrink: 0;
+    font-size: 10px;
+    color: var(--vscode-descriptionForeground);
+    user-select: none;
+    text-align: center;
+  }
+
+  .tree-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin: 0 2px;
+  }
+
+  .tree-children.collapsed {
+    display: none;
+  }
+
+  .tree-actions {
+    display: flex;
+    gap: 3px;
+    flex-shrink: 0;
+    visibility: hidden;
+  }
+
+  .tree-row:hover .tree-actions,
+  .tree-row.selected .tree-actions {
+    visibility: visible;
+  }
+
+  .tree-act-btn {
+    display: inline-block;
+    width: auto;
+    padding: 1px 5px;
+    font-size: 10px;
+    height: auto;
+    margin: 0;
+    line-height: 14px;
+  }
+
+  .tree-file-indicator {
+    display: inline-block;
+    width: 14px;
+    flex-shrink: 0;
+    font-size: 9px;
+    text-align: center;
+    color: var(--vscode-charts-green, #4caf50);
+  }
+
+  .tree-row.tree-running .tree-name {
+    color: var(--vscode-charts-green, #4caf50);
   }
 
 </style>
@@ -259,14 +364,13 @@
   <h1 class="app-title">Soldered MicroPython Helper</h1>
 </div>
 
-<!-- Info & Instructions Section (includes intro + features) -->
-<div class="section toggleable open" id="infoSection">
+<!-- Info & Instructions Section — collapsed by default -->
+<div class="section toggleable" id="infoSection">
   <h4 onclick="toggleSection('infoSection')">
     <span class="arrow">▶</span> Info & Instructions
   </h4>
   <div class="section-content">
 
-    <!-- Intro Text -->
     <p class="intro-text" style="margin-top: 0;">
       <strong>Soldered MicroPython Helper</strong> is a Visual Studio Code extension that helps you get started with your MicroPython projects using a friendly graphical interface.
     </p>
@@ -277,57 +381,53 @@
       You can explore the full source code on GitHub, submit issues or pull requests, and leave feedback on the extension page in the VS Code Marketplace.
     </p>
 
-    <!-- Instructions List -->
     <ul style="list-style-type: disc; padding-left: 20px; margin-top: 1.2rem;">
-      <li><strong>Flash Firmware:</strong> The <em>Download + Flash from Web</em> option supports <code>ESP32_GENERIC</code> (via <code>esptool</code>, <code>.bin</code>) and <code>RP2040/RP2350</code> boards (via <code>.uf2</code> copy to the boot drive; e.g., Raspberry Pi Pico / Pico W, Pico 2 / Pico 2 W, Arduino Nano RP2040 Connect, SparkFun Pro Micro RP2040/RP2350). Flashing methods may differ for other microcontrollers—consult official docs if you're using a different board.</li>
-      <li><strong>Upload Python Scripts:</strong> You can upload the currently active file as <code>main.py</code>, keep the original filename, or select a local <code>.py</code> file from your computer.</li>
-      <li><strong>Manage Files:</strong> List, delete, run, or open files stored on the device. Double-click a file to open it in the VS Code editor.</li>
-      <li><strong>Serial Monitor:</strong> View live output from the board over serial. Starts automatically after running a script, or can be launched manually.</li>
-      <li><strong>Fetch Soldered Modules:</strong> Search and download libraries and/or examples for Soldered hardware modules. You don’t need to specify the category (e.g., Sensor, Display, Actuator).</li>
+      <li><strong>Flash Firmware:</strong> The <em>Download + Flash from Web</em> option supports <code>ESP32_GENERIC</code> (via <code>esptool</code>, <code>.bin</code>) and <code>RP2040/RP2350</code> boards (via <code>.uf2</code> copy to the boot drive).</li>
+      <li><strong>Upload Python Scripts:</strong> Upload the currently open file or pick a file from your PC.</li>
+      <li><strong>Manage Files:</strong> List, delete, run, or open files stored on the device. Double-click a file to open it in the editor.</li>
+      <li><strong>Serial Monitor:</strong> View live output from the board over serial.</li>
+      <li><strong>Fetch Soldered Modules:</strong> Search and download libraries and examples for Soldered hardware modules.</li>
     </ul>
 
     <p style="margin-top: 1rem; font-size: 0.9em; color: var(--vscode-descriptionForeground);">
-      ⚠ If you encounter errors, make sure the selected port is correct and not in use by another application.
+      If you encounter errors, make sure the selected port is correct and not in use by another application.
     </p>
 
   </div>
 </div>
 
 <!-- COM Port Dropdown (Shared) -->
-<label for="port">COM port Selection</label>
-<select id="port"></select>
+<label for="port">COM Port:</label>
+<select id="port">
+  <option value="" disabled selected>-- Select port --</option>
+</select>
 <button id="refreshPortsBtn" title="Refresh ports" aria-label="Refresh ports">Refresh ports</button>
-
 <p style="
   margin-top: 10px;
   font-size: 0.95rem;
   font-style: italic;
   color: var(--vscode-descriptionForeground);
 ">
-  Only ESP32, RP2040 and RP2350 boards are supported for now.
+  Supported: ESP32, RP2040 and RP2350 boards.
 </p>
 
 <!-- Flash Firmware Section -->
-<!-- Collapsible UI section for flashing MicroPython firmware -->
-<div class="section toggleable" id="flashSection">
 
-  <!-- Clickable header with arrow icon to toggle visibility of content -->
+<div class="section toggleable" id="flashSection">
   <h4 onclick="toggleSection('flashSection')">
-    <span class="arrow">▶</span> Install Micropython on your board
+    <span class="arrow">▶</span> Install MicroPython on your board
   </h4>
 
-  <!-- Hidden content that slides open when section is expanded -->
   <div class="section-content">
+    <div id="mpInstalledBanner" style="display: none; padding: 4px 8px; margin-bottom: 8px; border-radius: 4px; font-size: 11px; border: 1px solid var(--vscode-testing-iconPassed, #4caf50); color: var(--vscode-testing-iconPassed, #4caf50);">
+      MicroPython is already installed on this board.
+    </div>
 
-    <!-- Text input to search for firmware builds on the MicroPython site -->
-    <label for="firmwareQuery">Search Firmware (e.g. esp32)</label>
-    <input type="text" id="firmwareQuery" placeholder="Type board name...">
+    <label for="firmwareSelect">Select your board:</label>
+    <select id="firmwareSelect">
+      <option value="" disabled selected>Loading firmware list...</option>
+    </select>
 
-    <!-- Firmware select box populated with top matches based on search query -->
-    <label for="firmwareSelect">Top 5 Matches</label>
-    <select id="firmwareSelect" size="5"></select>
-
-    <!-- Flash From Web button with animated dots -->
     <button id="flashFromWebBtn">
       <span id="flashBtnText">Download + Flash from Web</span>
       <span id="flashBtnSpinner" style="display: none;">
@@ -342,7 +442,12 @@
       </span>
     </button>
 
-    <!-- Visual feedback placeholder -->
+    <div id="flashProgressContainer" style="display: none; margin: 8px 0;">
+      <div id="flashProgressLabel" style="font-size: 11px; color: var(--vscode-descriptionForeground); margin-bottom: 4px;">Flashing...</div>
+      <div style="background: var(--vscode-editorGroup-border); border-radius: 2px; height: 4px; overflow: hidden;">
+        <div id="flashProgressBar" style="height: 100%; width: 0%; background: var(--vscode-progressBar-background, #0e70c0); transition: width 0.3s ease;"></div>
+      </div>
+    </div>
 
     <p style="
       margin-top: 10px;
@@ -357,96 +462,63 @@
 </div>
 
 <!-- Collapsible section for uploading Python files and managing them on the device -->
-<!-- Upload & Manage Section -->
 <div class="section toggleable" id="uploadSection">
   <h4 onclick="toggleSection('uploadSection')">
-    <span class="arrow">▶</span> Upload & Manage Python Scripts
+    <span class="arrow">▶</span> Run & Manage Files
   </h4>
 
   <div class="section-content">
 
-    <!-- Row 1: Upload active, upload from PC, list files, refresh -->
-    <div class="icon-button-row">
-      <button id="uploadAsIsBtn" class="icon-button" title="Upload active Python file">
-        <!-- file-up icon -->
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-          <polyline points="14 2 14 8 20 8"/>
-          <path d="M12 12v6"/>
-          <path d="M9 15l3-3 3 3"/>
-        </svg>
-      </button>
-
-      <button id="uploadFromPcBtn" class="icon-button" title="Upload Python file from PC">
-        <!-- monitor-up icon -->
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-          <line x1="8" y1="21" x2="16" y2="21"/>
-          <line x1="12" y1="17" x2="12" y2="21"/>
-          <path d="M12 13V7"/>
-          <path d="M9 10l3-3 3 3"/>
-        </svg>
-      </button>
-
-      <button id="listFilesBtn" class="icon-button" title="List files on device">
-        <!-- list icon -->
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="8" y1="6" x2="21" y2="6" />
-          <line x1="8" y1="12" x2="21" y2="12" />
-          <line x1="8" y1="18" x2="21" y2="18" />
-          <line x1="3" y1="6" x2="3.01" y2="6" />
-          <line x1="3" y1="12" x2="3.01" y2="12" />
-          <line x1="3" y1="18" x2="3.01" y2="18" />
-        </svg>
-      </button>
-
-      <button id="refreshBtn" class="icon-button" title="Refresh file list">
-        <!-- refresh-ccw icon -->
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="1 4 1 10 7 10" />
-          <path d="M3.51 15a9 9 0 1 0 .49-7" />
-        </svg>
-      </button>
+    <!-- Row 1: Upload -->
+    <div class="buttons-row">
+      <button id="uploadAsIsBtn" title="Upload active Python file">Upload Open File</button>
+      <button id="uploadFromPcBtn" title="Upload Python file from PC">Upload from PC</button>
     </div>
 
-    <!-- Row 2: Run, terminal, stop, delete -->
-    <div class="icon-button-row">
-      <button id="runFileBtn" class="icon-button" title="Run selected file">
-        <!-- play icon -->
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polygon points="5 3 19 12 5 21 5 3" />
-        </svg>
-      </button>
-
-      <button id="serialMonitorBtn" class="icon-button" title="Start/Stop Serial Monitor">
-        <!-- terminal icon -->
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="4 17 10 11 4 5" />
-          <line x1="12" y1="19" x2="20" y2="19" />
-        </svg>
-      </button>
-
-      <button id="stopCodeBtn" class="icon-button" title="Stop running code">
-        <!-- square icon -->
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="6" y="6" width="12" height="12" />
-        </svg>
-      </button>
-
-      <button id="deleteFileBtn" class="icon-button" title="Delete selected file">
-        <!-- trash icon -->
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="3 6 5 6 21 6" />
-          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-          <line x1="10" y1="11" x2="10" y2="17" />
-          <line x1="14" y1="11" x2="14" y2="17" />
-        </svg>
-      </button>
+    <!-- Row 2: Run + Stop -->
+    <div class="buttons-row">
+      <button id="runFileBtn" title="Run selected file">Run</button>
+      <button id="stopCodeBtn" title="Stop running code">Stop</button>
     </div>
 
-    <!-- File dropdown list -->
-    <label for="fileSelect">Files on Device</label>
-    <select id="fileSelect" size="12" style="width: 100%;"></select>
+    <!-- List Files + Open -->
+    <div class="buttons-row">
+      <button id="listFilesBtn" title="List files on device">List Files</button>
+      <button id="openFileBtn" title="Open selected file from device in editor">Open File from Board</button>
+    </div>
+
+    <!-- Serial Monitor -->
+    <button id="serialMonitorBtn" title="Start/Stop Serial Monitor">Serial Monitor</button>
+    <div id="serialSendRow" style="display:none; margin-top:6px; margin-bottom:6px;">
+      <div style="display:flex; gap:6px; align-items:center;">
+        <input type="text" id="serialSendInput" placeholder="Send data to board..." style="flex:1; margin-bottom:0;" />
+        <button id="serialSendBtn" style="width:auto; margin:0; padding:4px 10px; flex-shrink:0;">Send</button>
+      </div>
+    </div>
+
+    <!-- Delete Selected + Delete All -->
+    <div class="buttons-row">
+      <button id="deleteFileBtn" class="btn-danger" title="Delete selected file or folder">Delete Selected</button>
+      <button id="deleteAllFilesBtn" class="btn-danger" title="Delete all files except boot.py and main.py">Delete All Files</button>
+    </div>
+
+    <!-- File tree -->
+    <div id="fileTreeContainer" style="
+      background: var(--vscode-input-background);
+      border: 1px solid var(--vscode-input-border);
+      border-radius: 4px;
+      margin-top: 4px;
+    ">
+      <p id="fileListEmpty" style="
+        display: block;
+        font-style: italic;
+        font-size: 0.9em;
+        color: var(--vscode-descriptionForeground);
+        margin: 0;
+        padding: 8px 8px;
+      ">No files found — click List Files.</p>
+      <div id="fileTree" class="file-tree"></div>
+    </div>
 
   </div>
 </div>
@@ -457,14 +529,29 @@
     <span class="arrow">▶</span> Fetch Soldered MicroPython Module
   </h4>
   <div class="section-content">
-    <label for="moduleSearch">Search for a sensor/module (e.g. ltr, temp, acc)</label>
-    <input type="text" id="moduleSearch" placeholder="Type keyword..." />
+    <button id="refreshModulesBtn" title="Refresh module list from GitHub">↻ Refresh module list</button>
+    <div id="modulesCacheStatus" style="font-size: 0.82em; color: var(--vscode-descriptionForeground); margin-top: 4px; margin-bottom: 8px; display: none;"></div>
+    <div id="modulesLoadingStatus" style="font-size: 0.82em; color: var(--vscode-descriptionForeground); margin-top: 4px; margin-bottom: 8px; display: none;">Fetching from GitHub...</div>
 
-    <label for="moduleSelect">Matching Modules</label>
-    <select id="moduleSelect" size="6"></select>
+    <label for="moduleSearchInput">Search module:</label>
+    <div class="module-search-wrap">
+      <input type="text" id="moduleSearchInput" placeholder="Loading modules..." disabled />
+      <ul id="moduleSuggestions"></ul>
+    </div>
+
+    <div class="or-divider">or browse by category</div>
+
+    <label for="categorySelect">Category:</label>
+    <select id="categorySelect">
+      <option value="" disabled selected>Loading categories...</option>
+    </select>
+
+    <label for="moduleSelect">Module:</label>
+    <select id="moduleSelect">
+      <option value="" disabled selected>Select a category first</option>
+    </select>
 
     <div class="buttons-row">
-
       <button id="fetchLibraryBtn">
         <span id="libBtnText">Download Library</span>
         <span id="libBtnSpinner" style="display: none;">
@@ -478,15 +565,14 @@
           &nbsp;<span class="dot-flash">.</span><span class="dot-flash">.</span><span class="dot-flash">.</span>
         </span>
       </button>
-
-      <button id="fetchAllBtn">
-        <span id="allBtnText">Download Both</span>
-        <span id="allBtnSpinner" style="display: none;">
-          &nbsp;<span class="dot-flash">.</span><span class="dot-flash">.</span><span class="dot-flash">.</span>
-        </span>
-      </button>
-
     </div>
+
+    <button id="fetchAllBtn">
+      <span id="allBtnText">Download Both</span>
+      <span id="allBtnSpinner" style="display: none;">
+        &nbsp;<span class="dot-flash">.</span><span class="dot-flash">.</span><span class="dot-flash">.</span>
+      </span>
+    </button>
   </div>
 </div>
 
@@ -494,6 +580,171 @@
 
 // Gain access to the VS Code Webview API
 const vscode = acquireVsCodeApi();
+
+// Currently selected file path in the tree (null if nothing selected)
+let selectedFilePath = null;
+let selectedFileType = null;
+
+/**
+ * Renders a tree of file/dir nodes into the given container element.
+ * Folders are expanded by default and can be toggled.
+ * Files show Open / Run / Del inline buttons on hover.
+ */
+function renderFileTree(nodes, container, depth) {
+  const getPort = () => document.getElementById('port').value;
+
+  nodes.forEach(node => {
+    const row = document.createElement('div');
+    row.className = 'tree-row';
+    row.dataset.path = node.path;
+    row.dataset.type = node.type;
+
+    if (depth > 0) {
+      const indent = document.createElement('span');
+      indent.style.cssText = `display:inline-block;width:${depth * 16}px;flex-shrink:0`;
+      row.appendChild(indent);
+    }
+
+    if (node.type === 'dir') {
+      const toggle = document.createElement('span');
+      toggle.className = 'tree-toggle';
+      toggle.textContent = '▾';
+      row.appendChild(toggle);
+
+      const label = document.createElement('span');
+      label.className = 'tree-name';
+      label.textContent = '📁 ' + node.name;
+      row.appendChild(label);
+
+      const actions = document.createElement('span');
+      actions.className = 'tree-actions';
+      const delBtn = document.createElement('button');
+      delBtn.className = 'tree-act-btn btn-danger';
+      delBtn.textContent = 'Del';
+      delBtn.title = 'Delete folder recursively';
+      delBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        const port = getPort();
+        if (!port) return;
+        vscode.postMessage({ command: 'deleteFile', port, filename: node.path, type: 'dir' });
+      });
+      actions.appendChild(delBtn);
+      row.appendChild(actions);
+      container.appendChild(row);
+
+      const childrenDiv = document.createElement('div');
+      childrenDiv.className = 'tree-children';
+      container.appendChild(childrenDiv);
+
+      if (node.children && node.children.length > 0) {
+        renderFileTree(node.children, childrenDiv, depth + 1);
+      }
+
+      row.addEventListener('click', e => {
+        if (e.target === delBtn) return;
+        const collapsed = childrenDiv.classList.toggle('collapsed');
+        toggle.textContent = collapsed ? '▶' : '▾';
+      });
+
+    } else {
+      const toggleSpacer = document.createElement('span');
+      toggleSpacer.className = 'tree-file-indicator';
+      row.appendChild(toggleSpacer);
+
+      const label = document.createElement('span');
+      label.className = 'tree-name';
+      label.textContent = '📄 ' + node.name;
+      row.appendChild(label);
+
+      const actions = document.createElement('span');
+      actions.className = 'tree-actions';
+
+      const openBtn = document.createElement('button');
+      openBtn.className = 'tree-act-btn';
+      openBtn.textContent = 'Open';
+      openBtn.title = 'Open in editor';
+      openBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        const port = getPort();
+        if (!port) return;
+        vscode.postMessage({ command: 'openFileFromDevice', port, filename: node.path });
+      });
+
+      const runBtn = document.createElement('button');
+      runBtn.className = 'tree-act-btn';
+      runBtn.textContent = 'Run';
+      runBtn.title = 'Run on device';
+      runBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        const port = getPort();
+        if (!port) return;
+        vscode.postMessage({ command: 'runPythonFile', port, filename: node.path });
+      });
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'tree-act-btn btn-danger';
+      delBtn.textContent = 'Del';
+      delBtn.title = 'Delete file';
+      delBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        const port = getPort();
+        if (!port) return;
+        vscode.postMessage({ command: 'deleteFile', port, filename: node.path, type: 'file' });
+      });
+
+      actions.appendChild(openBtn);
+      actions.appendChild(runBtn);
+      actions.appendChild(delBtn);
+      row.appendChild(actions);
+
+      row.addEventListener('click', () => {
+        document.querySelectorAll('#fileTree .tree-row.selected').forEach(el => el.classList.remove('selected'));
+        row.classList.add('selected');
+        selectedFilePath = node.path;
+        selectedFileType = 'file';
+        updateButtonStates(getPort());
+      });
+
+      row.addEventListener('dblclick', () => {
+        const port = getPort();
+        if (!port) return;
+        vscode.postMessage({ command: 'openFileFromDevice', port, filename: node.path });
+      });
+
+      container.appendChild(row);
+    }
+  });
+}
+
+/**
+ * Renders tree nodes into #fileTree, showing or hiding the empty message.
+ * Clears current selection.
+ */
+function renderFileTreeUI(nodes) {
+  const treeDiv = document.getElementById('fileTree');
+  const emptyMsg = document.getElementById('fileListEmpty');
+  treeDiv.innerHTML = '';
+  selectedFilePath = null;
+  selectedFileType = null;
+
+  if (!nodes || nodes.length === 0) {
+    emptyMsg.style.display = 'block';
+  } else {
+    emptyMsg.style.display = 'none';
+    renderFileTree(nodes, treeDiv, 0);
+  }
+  updateButtonStates(document.getElementById('port').value);
+}
+
+function formatCacheAge(timestamp) {
+  const diffMs = Date.now() - timestamp;
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return 'last updated just now';
+  if (diffMin < 60) return `last updated ${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `last updated ${diffHr}h ago`;
+  return `last updated ${Math.floor(diffHr / 24)}d ago`;
+}
 
 function saveToggleState() {
   const state = {};
@@ -522,12 +773,27 @@ function toggleSection(id) {
 }
 
 // === Init events ===
+let portScanInterval = null;
+
+function startPortScanning() {
+  if (portScanInterval) return;
+  portScanInterval = setInterval(() => vscode.postMessage({ command: 'getPorts' }), 4000);
+}
+
+function stopPortScanning() {
+  if (portScanInterval) {
+    clearInterval(portScanInterval);
+    portScanInterval = null;
+  }
+}
+
 window.addEventListener('load', () => {
-  // When the webview is first loaded, fetch firmware options based on current input
   restoreToggleState();
-  const board = document.getElementById('firmwareQuery').value;
-  const port = document.getElementById('port').value;
-  vscode.postMessage({ command: 'getFirmwareOptions', board, port });
+  restoreState();
+  vscode.postMessage({ command: 'getFirmwareOptions' });
+  vscode.postMessage({ command: 'getCategories' });
+  vscode.postMessage({ command: 'getAllModules' });
+  startPortScanning();
 });
 
 window.addEventListener('focus', () => {
@@ -535,15 +801,39 @@ window.addEventListener('focus', () => {
 });
 
 // Serial Monitor Button
+let serialMonitorActive = false;
+let scriptRunning = false;
+
+function updateSendRowVisibility() {
+  const sendRow = document.getElementById('serialSendRow');
+  if (sendRow) sendRow.style.display = (serialMonitorActive || scriptRunning) ? 'block' : 'none';
+}
+
 document.getElementById('serialMonitorBtn').addEventListener('click', () => {
   const port = document.getElementById('port').value;
-  if (!port) return alert('Please select a COM port.');
-  vscode.postMessage({ command: 'startSerialMonitor', port });
+  if (!port) return;
+  if (serialMonitorActive) {
+    vscode.postMessage({ command: 'stopSerialMonitor', port });
+  } else {
+    vscode.postMessage({ command: 'startSerialMonitor', port });
+  }
+});
+
+document.getElementById('serialSendBtn').addEventListener('click', () => {
+  const input = document.getElementById('serialSendInput');
+  const port = document.getElementById('port').value;
+  if (!port || !input.value) return;
+  vscode.postMessage({ command: 'sendSerial', port, data: input.value });
+  input.value = '';
+});
+
+document.getElementById('serialSendInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('serialSendBtn').click();
 });
 
 document.getElementById('stopCodeBtn').addEventListener('click', () => {
   const port = document.getElementById('port').value;
-  if (!port) return alert('Please select a COM port.');
+  if (!port) return;
   vscode.postMessage({ command: 'stopRunningCode', port });
 });
 
@@ -553,12 +843,6 @@ document.getElementById('refreshPortsBtn').addEventListener('click', () => {
 });
 
 
-// Update firmware options as the user types in the search input
-document.getElementById('firmwareQuery').addEventListener('input', (e) => {
-  const board = e.target.value;
-  const port = document.getElementById('port').value;
-  vscode.postMessage({ command: 'getFirmwareOptions', board, port });
-});
 
 // === Flash from Web ===
 document.getElementById('flashFromWebBtn').addEventListener('click', () => {
@@ -568,7 +852,6 @@ document.getElementById('flashFromWebBtn').addEventListener('click', () => {
 
   // Validate inputs before proceeding
   if (!firmwareUrl || !port) {
-    alert('Please select firmware and port before flashing.');
     return;
   }
 
@@ -584,17 +867,46 @@ document.getElementById('flashFromWebBtn').addEventListener('click', () => {
 window.addEventListener('message', (event) => {
   const message = event.data;
 
-  // Populate firmware select box with search results
+  // Populate firmware select box grouped by board type
   if (message.command === 'setFirmwareOptions') {
     const select = document.getElementById('firmwareSelect');
-    select.innerHTML = ''; // Clear previous options
+    select.innerHTML = '';
 
-    // Create an <option> for each firmware item
+    // Always prepend a placeholder
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.disabled = true;
+    placeholder.selected = true;
+    placeholder.textContent = '-- Select board --';
+    select.appendChild(placeholder);
+
+    if (!message.options || message.options.length === 0) {
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.disabled = true;
+      opt.textContent = 'No firmware found';
+      select.appendChild(opt);
+      return;
+    }
+
+    // Group by boardType
+    const groups = {};
     message.options.forEach(opt => {
-      const option = document.createElement('option');
-      option.value = opt.url;
-      option.textContent = opt.name;
-      select.appendChild(option);
+      if (!groups[opt.boardType]) groups[opt.boardType] = [];
+      groups[opt.boardType].push(opt);
+    });
+
+    // Render optgroups
+    Object.keys(groups).sort().forEach(boardType => {
+      const group = document.createElement('optgroup');
+      group.label = boardType;
+      groups[boardType].forEach(opt => {
+        const option = document.createElement('option');
+        option.value = opt.url;
+        option.textContent = `${opt.name} (v${opt.version})`;
+        group.appendChild(option);
+      });
+      select.appendChild(group);
     });
   }
 
@@ -604,8 +916,15 @@ window.addEventListener('message', (event) => {
 
   if (message.command === 'populatePorts') {
     const select = document.getElementById('port');
-    const prev = select.value;                       // remember current selection
+    const prev = currentState.port || select.value;   // prefer saved state over DOM value
     select.innerHTML = '';
+
+    // Always keep a placeholder as first option
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.disabled = true;
+    placeholder.textContent = '-- Select port --';
+    select.appendChild(placeholder);
 
     const ports = message.ports || [];
     ports.forEach(p => {
@@ -615,21 +934,24 @@ window.addEventListener('message', (event) => {
       select.appendChild(option);
     });
 
-    // restore previous if still present, otherwise pick first (if any)
+    // restore previous selection if still present — otherwise leave empty (user must choose)
     let toSelect = '';
     if (ports.includes(prev)) {
       toSelect = prev;
-    } else if (ports.length) {
-      toSelect = ports[0];
     }
 
     if (toSelect) {
       select.value = toSelect;
-      // Tell backend which port is active (so it updates mp.lastPort)
       vscode.postMessage({ command: 'noop', port: toSelect });
-      // Optionally refresh the file list for the currently selected port
-      vscode.postMessage({ command: 'listFiles', port: toSelect });
+      vscode.postMessage({ command: 'checkMicroPython', port: toSelect });
+      stopPortScanning();
+    } else {
+      placeholder.selected = true;
+      startPortScanning();
     }
+
+    // Enable/disable port-dependent buttons based on whether a port is available
+    updateButtonStates(toSelect);
   }
 
   if (message.command === 'resetFlashButton') {
@@ -644,27 +966,59 @@ window.addEventListener('message', (event) => {
     }
   }
 
-  // Show a list of files currently on the device
+  // Show files on the device as a tree
   if (message.command === 'displayFiles') {
-    const fileSelect = document.getElementById('fileSelect');
-    fileSelect.innerHTML = ''; // Clear list
-
-    // Save file list into local state
     currentState.files = message.files;
-
-    message.files.forEach(file => {
-      const option = document.createElement('option');
-      option.value = file;
-      option.textContent = file;
-      fileSelect.appendChild(option);
-    });
-
-    saveState(); // Persist to VS Code state
+    renderFileTreeUI(message.files);
+    saveState();
   }
 
   if (message.command === 'flashStatusUpdate') {
     const state = message.text;
     setFlashingState(state);
+  }
+
+  if (message.command === 'runStatus') {
+    scriptRunning = message.running;
+    updateSendRowVisibility();
+    // Clear previous running indicator
+    document.querySelectorAll('#fileTree .tree-running').forEach(el => {
+      el.classList.remove('tree-running');
+      const ind = el.querySelector('.tree-file-indicator');
+      if (ind) ind.textContent = '';
+    });
+    if (message.running && message.filename) {
+      const row = document.querySelector(`#fileTree .tree-row[data-path="${CSS.escape(message.filename)}"]`);
+      if (row) {
+        row.classList.add('tree-running');
+        const ind = row.querySelector('.tree-file-indicator');
+        if (ind) ind.textContent = '▶';
+      }
+    }
+  }
+
+  if (message.command === 'serialMonitorStatus') {
+    serialMonitorActive = message.active;
+    const btn = document.getElementById('serialMonitorBtn');
+    if (btn) btn.textContent = message.active ? 'Stop Serial Monitor' : 'Serial Monitor';
+    updateSendRowVisibility();
+  }
+
+  if (message.command === 'micropythonStatus') {
+    if (message.installed) {
+      const banner = document.getElementById('mpInstalledBanner');
+      if (banner) banner.style.display = 'block';
+    }
+    // don't hide on false — transient failures (port busy, timing) would remove it incorrectly
+  }
+
+  if (message.command === 'flashProgress') {
+    const container = document.getElementById('flashProgressContainer');
+    const bar = document.getElementById('flashProgressBar');
+    const label = document.getElementById('flashProgressLabel');
+    if (container) container.style.display = 'block';
+    if (bar) bar.style.width = `${message.percent}%`;
+    if (label) label.textContent = message.label;
   }
 
   if (message.command === 'uploadStatusUpdate') {
@@ -681,67 +1035,64 @@ window.addEventListener('message', (event) => {
 // Flash a local .bin file using a file picker
 document.getElementById('flashLocalBtn').addEventListener('click', () => {
   const port = document.getElementById('port').value;
-  if (!port) return alert('Please select the COM Port before flashing.');
+  if (!port) return;
   vscode.postMessage({ command: 'flashFirmware', port });
 });
 
 // Upload active editor file with original filename
 document.getElementById('uploadAsIsBtn').addEventListener('click', () => {
   const port = document.getElementById('port').value;
-  if (!port) return alert('Please select the COM Port before uploading.');
+  if (!port) return;
   vscode.postMessage({ command: 'uploadPythonAsIs', port });
 });
 
 // Request list of files on the device
 document.getElementById('listFilesBtn').addEventListener('click', () => {
   const port = document.getElementById('port').value;
-  if (!port) return alert('Please select the COM Port before listing files.');
+  if (!port) return;
   vscode.postMessage({ command: 'listFiles', port });
 });
 
-// Same as above but named "refresh"
-document.getElementById('refreshBtn').addEventListener('click', () => {
+
+// Delete all files from the device (keeps boot.py and main.py)
+document.getElementById('deleteAllFilesBtn').addEventListener('click', () => {
   const port = document.getElementById('port').value;
-  if (!port) return alert('Please select the COM Port before refreshing files.');
-  vscode.postMessage({ command: 'listFiles', port });
+  if (!port) return;
+  vscode.postMessage({ command: 'deleteAllFiles', port });
 });
 
-// Delete the selected file from the device
-document.getElementById('deleteFileBtn').addEventListener('click', () => {
-  const port = document.getElementById('port').value;
-  const filename = document.getElementById('fileSelect').value;
-  if (!port) return alert('Please select the COM Port before deleting a file.');
-  if (!filename) return alert('No file selected to delete.');
-  vscode.postMessage({ command: 'deleteFile', port, filename });
+// Force-refresh module list from GitHub (bypasses cache)
+document.getElementById('refreshModulesBtn').addEventListener('click', () => {
+  allModulesLoaded = false;
+  updateButtonStates(document.getElementById('port').value);
+  vscode.postMessage({ command: 'getAllModules', force: true });
 });
 
-// Run the selected Python file from the device
+// Run the selected Python file from the device (uses tree selection)
 document.getElementById('runFileBtn').addEventListener('click', () => {
   const port = document.getElementById('port').value;
-  const filename = document.getElementById('fileSelect').value;
-  if (!port) return alert('Please select the COM Port before running a file.');
-  if (!filename) return alert('No file selected to run.');
-  vscode.postMessage({ command: 'runPythonFile', port, filename });
+  if (!port || !selectedFilePath) return;
+  vscode.postMessage({ command: 'runPythonFile', port, filename: selectedFilePath });
 });
 
-// Double-click on a file to open it in VS Code editor
-document.getElementById('fileSelect').addEventListener('dblclick', () => {
+// Open selected file from device in editor
+document.getElementById('openFileBtn').addEventListener('click', () => {
   const port = document.getElementById('port').value;
-  const filename = document.getElementById('fileSelect').value;
+  if (!port || !selectedFilePath) return;
+  vscode.postMessage({ command: 'openFileFromDevice', port, filename: selectedFilePath });
+});
 
-  if (!port || !filename) {
-    alert('Please select a COM port and a file to open.');
-    return;
-  }
-
-  // Ask extension to download the file to temp and open it
-  vscode.postMessage({ command: 'openFileFromDevice', port, filename });
+// Delete selected file or folder
+document.getElementById('deleteFileBtn').addEventListener('click', () => {
+  const port = document.getElementById('port').value;
+  if (!port || !selectedFilePath) return;
+  vscode.postMessage({ command: 'deleteFile', port, filename: selectedFilePath, type: selectedFileType || 'file' });
 });
 
 // Upload a .py file from user's computer to the device
 document.getElementById('uploadFromPcBtn').addEventListener('click', () => {
   const port = document.getElementById('port').value;
-  if (!port) return alert('Please select the COM Port before uploading.');
+  if (!port) return;
   vscode.postMessage({ command: 'uploadPythonFromPc', port });
 });
 
@@ -750,10 +1101,10 @@ document.getElementById('uploadFromPcBtn').addEventListener('click', () => {
 // Holds current state of key UI elements so it can be restored on reload
 let currentState = {
   port: '',
-  firmwareQuery: '',
   selectedFirmware: '',
   files: []
 };
+
 
 // Save current state into VS Code's persistent Webview state
 function saveState() {
@@ -766,9 +1117,8 @@ function restoreState() {
   if (state) {
     currentState = state;
 
-    // Restore previously selected COM port and firmware query input
+    // Restore previously selected COM port
     document.getElementById('port').value = currentState.port || '';
-    document.getElementById('firmwareQuery').value = currentState.firmwareQuery || '';
 
     // Restore selected firmware item if still in the dropdown
     if (currentState.selectedFirmware) {
@@ -778,15 +1128,10 @@ function restoreState() {
       });
     }
 
-    // Restore file list
-    const fileSelect = document.getElementById('fileSelect');
-    fileSelect.innerHTML = '';
-    currentState.files.forEach(file => {
-      const option = document.createElement('option');
-      option.value = file;
-      option.textContent = file;
-      fileSelect.appendChild(option);
-    });
+    // Restore file tree
+    if (currentState.files && currentState.files.length > 0) {
+      renderFileTreeUI(currentState.files);
+    }
   }
 
   // Always ask backend to refresh available ports just in case
@@ -801,20 +1146,66 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-// Track COM port selection changes and update state + trigger file list
+// IDs of buttons that require a port to function
+const PORT_DEPENDENT_BTNS = [
+  'uploadAsIsBtn', 'uploadFromPcBtn', 'listFilesBtn',
+  'runFileBtn', 'stopCodeBtn', 'serialMonitorBtn', 'openFileBtn', 'deleteFileBtn', 'deleteAllFilesBtn',
+  'flashFromWebBtn', 'flashLocalBtn', 'fetchLibraryBtn', 'fetchExamplesBtn', 'fetchAllBtn'
+];
+
+// IDs of dropdowns/inputs that require a port
+const PORT_DEPENDENT_INPUTS = [
+  'firmwareSelect', 'categorySelect', 'moduleSelect'
+];
+
+function updateButtonStates(port) {
+  const noPort = !port || port.trim() === '';
+  PORT_DEPENDENT_BTNS.forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) {
+      btn.disabled = noPort;
+      btn.title = noPort ? 'Select a port first' : btn.getAttribute('data-title') || '';
+    }
+  });
+  PORT_DEPENDENT_INPUTS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = noPort;
+  });
+  // Run / Open / Delete Selected also require a file to be selected in the tree
+  const runBtn = document.getElementById('runFileBtn');
+  if (runBtn) runBtn.disabled = noPort || !selectedFilePath;
+  const openBtn = document.getElementById('openFileBtn');
+  if (openBtn) openBtn.disabled = noPort || !selectedFilePath;
+  const delBtn = document.getElementById('deleteFileBtn');
+  if (delBtn) delBtn.disabled = noPort || !selectedFilePath;
+  // moduleSearchInput only enabled if port selected AND modules loaded
+  const searchInput = document.getElementById('moduleSearchInput');
+  if (searchInput) searchInput.disabled = noPort || !allModulesLoaded;
+}
+
+// Save original titles so we can restore them
+PORT_DEPENDENT_BTNS.forEach(id => {
+  const btn = document.getElementById(id);
+  if (btn) btn.setAttribute('data-title', btn.title);
+});
+
+// Run on load
+updateButtonStates(document.getElementById('port').value);
+
+// Track COM port selection changes and update state
 document.getElementById('port').addEventListener('change', e => {
   const port = e.target.value;
   currentState.port = port;
   saveState();
-
-  vscode.postMessage({ command: 'listFiles', port });
-
-});
-
-// Track changes in the firmware search input and update state
-document.getElementById('firmwareQuery').addEventListener('input', e => {
-  currentState.firmwareQuery = e.target.value;
-  saveState();
+  updateButtonStates(port);
+  const banner = document.getElementById('mpInstalledBanner');
+  if (banner) banner.style.display = 'none';
+  if (port) {
+    stopPortScanning();
+    vscode.postMessage({ command: 'checkMicroPython', port });
+  } else {
+    startPortScanning();
+  }
 });
 
 // Track selected firmware option and update state
@@ -825,25 +1216,102 @@ document.getElementById('firmwareSelect').addEventListener('change', e => {
 
 // === Soldered Module Fetching ===
 
-const moduleSearchInput = document.getElementById('moduleSearch');
+const categorySelect = document.getElementById('categorySelect');
 const moduleSelect = document.getElementById('moduleSelect');
-const portSelect = document.getElementById('port');
+const moduleSearchInput = document.getElementById('moduleSearchInput');
+const moduleSuggestions = document.getElementById('moduleSuggestions');
 
-if (moduleSearchInput && moduleSelect) {
-  moduleSearchInput.addEventListener('input', (e) => {
-    const keyword = e.target.value.trim();
-    if (keyword.length >= 1) {
-      vscode.postMessage({ command: 'searchModules', keyword });
-    } else {
-      moduleSelect.innerHTML = ''; // Clear dropdown if empty input
-    }
+let allModulesCache = {};   // { [category]: string[] }
+let allModulesLoaded = false;
+
+function populateModuleSelect(category) {
+  moduleSelect.innerHTML = '<option value="" disabled selected>-- Select module --</option>';
+  (allModulesCache[category] || []).forEach(mod => {
+    const option = document.createElement('option');
+    option.value = mod;
+    option.textContent = mod;
+    moduleSelect.appendChild(option);
   });
 }
 
+function hideSuggestions() {
+  moduleSuggestions.style.display = 'none';
+  moduleSuggestions.innerHTML = '';
+}
+
+function showSuggestions(results) {
+  moduleSuggestions.innerHTML = '';
+  results.forEach(({ mod, cat }) => {
+    const li = document.createElement('li');
+    li.className = 'suggestion-item';
+    li.textContent = `${mod} — ${cat}`;
+    li.addEventListener('mousedown', (e) => {
+      e.preventDefault(); // prevent input blur before click fires
+      // Set category dropdown
+      categorySelect.value = cat;
+      // Populate module dropdown from cache
+      populateModuleSelect(cat);
+      // Set module dropdown
+      moduleSelect.value = mod;
+      // Sync text input
+      moduleSearchInput.value = mod;
+      hideSuggestions();
+    });
+    moduleSuggestions.appendChild(li);
+  });
+  moduleSuggestions.style.display = results.length ? 'block' : 'none';
+}
+
+// When category changes via dropdown, populate modules from cache or fetch
+categorySelect.addEventListener('change', () => {
+  const category = categorySelect.value;
+  moduleSearchInput.value = '';
+  hideSuggestions();
+  if (allModulesCache[category]) {
+    populateModuleSelect(category);
+  } else {
+    moduleSelect.innerHTML = '<option value="" disabled selected>Loading...</option>';
+    vscode.postMessage({ command: 'getModulesForCategory', category });
+  }
+});
+
+// When module changes via dropdown, sync text input
+moduleSelect.addEventListener('change', () => {
+  moduleSearchInput.value = moduleSelect.value;
+});
+
+// Live fuzzy search as user types
+moduleSearchInput.addEventListener('input', () => {
+  const query = moduleSearchInput.value.trim().toLowerCase();
+  hideSuggestions();
+  if (!query || !allModulesLoaded) return;
+
+  const results = [];
+  Object.entries(allModulesCache).forEach(([cat, mods]) => {
+    mods.forEach(mod => {
+      const ml = mod.toLowerCase();
+      if (ml.includes(query)) {
+        let score = 0;
+        if (ml === query) score = 2;
+        else if (ml.startsWith(query)) score = 1;
+        results.push({ mod, cat, score });
+      }
+    });
+  });
+
+  results.sort((a, b) => b.score - a.score || a.mod.localeCompare(b.mod));
+  showSuggestions(results.slice(0, 10));
+});
+
+// Hide suggestions when input loses focus
+moduleSearchInput.addEventListener('blur', () => {
+  setTimeout(hideSuggestions, 150);
+});
+
 const fetchModule = (mode) => {
   const sensor = moduleSelect?.value;
-  const port = portSelect?.value;
-  if (!sensor || !port) return alert('Select a module and port first.');
+  const port = document.getElementById('port')?.value;
+  if (!sensor || !port) return;
   vscode.postMessage({ command: 'fetchModule', sensor, port, mode });
 };
 
@@ -862,23 +1330,56 @@ document.getElementById('fetchAllBtn')?.addEventListener('click', () => {
   fetchModule('all');
 });
 
-// Handle list of matches from backend
+// Handle categories and modules from backend
 window.addEventListener('message', event => {
   const message = event.data;
 
-  if (message.command === 'setModuleMatches' && Array.isArray(message.matches)) {
-    moduleSelect.innerHTML = '';
-    
-    message.matches.forEach(match => {
+  if (message.command === 'setCategories' && Array.isArray(message.categories)) {
+    categorySelect.innerHTML = '<option value="" disabled selected>-- Select category --</option>';
+    message.categories.forEach(cat => {
       const option = document.createElement('option');
-      option.value = match;
-      option.textContent = match;
+      option.value = cat;
+      option.textContent = cat;
+      categorySelect.appendChild(option);
+    });
+  }
+
+  if (message.command === 'setModulesForCategory' && Array.isArray(message.modules)) {
+    moduleSelect.innerHTML = '<option value="" disabled selected>-- Select module --</option>';
+    message.modules.forEach(mod => {
+      const option = document.createElement('option');
+      option.value = mod;
+      option.textContent = mod;
       moduleSelect.appendChild(option);
     });
+    if (message.modules.length === 1) {
+      moduleSelect.value = message.modules[0];
+      moduleSearchInput.value = message.modules[0];
+    }
+  }
 
-    // Auto-select first result if available
-    if (message.matches.length > 0) {
-      moduleSelect.value = message.matches[0];
+  if (message.command === 'setAllModulesLoading') {
+    allModulesLoaded = false;
+    moduleSearchInput.placeholder = 'Loading modules...';
+    moduleSearchInput.disabled = true;
+    document.getElementById('modulesCacheStatus').style.display = 'none';
+    document.getElementById('modulesLoadingStatus').style.display = 'block';
+  }
+
+  if (message.command === 'setAllModules' && message.modules) {
+    allModulesCache = message.modules;
+    allModulesLoaded = true;
+    moduleSearchInput.placeholder = 'Type to search modules...';
+    const port = document.getElementById('port').value;
+    moduleSearchInput.disabled = !port;
+
+    document.getElementById('modulesLoadingStatus').style.display = 'none';
+    const cacheStatus = document.getElementById('modulesCacheStatus');
+    if (message.cachedAt) {
+      cacheStatus.textContent = 'Module list ' + formatCacheAge(message.cachedAt);
+      cacheStatus.style.display = 'block';
+    } else {
+      cacheStatus.style.display = 'none';
     }
   }
 });
@@ -929,7 +1430,6 @@ function setFlashingState(state) {
     spinner.style.display = 'none';
     setTimeout(manualResetFlashingUI, 1500);
   } else {
-    // Catch-all for unexpected states
     manualResetFlashingUI();
   }
 }
@@ -942,6 +1442,11 @@ function manualResetFlashingUI() {
   btn.disabled = false;
   btnText.textContent = 'Download + Flash from Web';
   spinner.style.display = 'none';
+
+  const container = document.getElementById('flashProgressContainer');
+  const bar = document.getElementById('flashProgressBar');
+  if (container) container.style.display = 'none';
+  if (bar) bar.style.width = '0%';
 }
 
 function setModuleFetchState(mode, state) {

@@ -9,7 +9,7 @@ out/
 *.vsix
 
 # VS Code IDE settings
-.vscode/
+# .vscode/
 
 # Logs and metadata
 *.log
