@@ -307,62 +307,70 @@
     box-sizing: border-box;
   }
 
-  .module-search-wrap {
-    position: relative;
-    margin-bottom: 0;
-  }
-
-  #moduleSearchInput {
+  #registryModuleSearch {
     margin-bottom: 0;
     width: 100%;
     box-sizing: border-box;
   }
 
-  #moduleSuggestions {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    background: var(--vscode-dropdown-background);
+  .registry-results {
     border: 1px solid var(--vscode-input-border);
-    border-top: none;
-    border-radius: 0 0 4px 4px;
-    max-height: 180px;
+    border-radius: 4px;
+    max-height: 260px;
     overflow-y: auto;
-    z-index: 100;
-    list-style: none;
+    margin: 6px 0 10px;
+    background: var(--vscode-input-background);
+  }
+
+  .registry-results-empty {
+    font-style: italic;
+    font-size: 0.85em;
+    color: var(--vscode-descriptionForeground);
     margin: 0;
-    padding: 0;
-    display: none;
+    padding: 10px 8px;
   }
 
-  .suggestion-item {
-    padding: 5px 8px;
+  .registry-result-item {
+    padding: 7px 9px;
     cursor: pointer;
-    font-size: 12px;
-    color: var(--vscode-foreground);
+    border-bottom: 1px solid var(--vscode-widget-border, var(--vscode-input-border));
   }
 
-  .suggestion-item:hover {
+  .registry-result-item:last-child {
+    border-bottom: none;
+  }
+
+  .registry-result-item:hover {
+    background: var(--vscode-list-hoverBackground);
+  }
+
+  .registry-result-item.selected {
     background: var(--vscode-list-activeSelectionBackground);
+  }
+
+  .registry-result-item.selected .registry-result-name,
+  .registry-result-item.selected .registry-result-author,
+  .registry-result-item.selected .registry-result-desc {
     color: var(--vscode-list-activeSelectionForeground);
   }
 
-  .or-divider {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin: 12px 0;
-    color: var(--vscode-descriptionForeground);
-    font-size: 0.85em;
+  .registry-result-name {
+    font-weight: 600;
+    font-size: 0.92em;
+    color: var(--vscode-foreground);
   }
 
-  .or-divider::before,
-  .or-divider::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: var(--vscode-editorGroup-border);
+  .registry-result-author {
+    font-size: 0.8em;
+    font-style: italic;
+    color: var(--vscode-descriptionForeground);
+    margin-left: 6px;
+  }
+
+  .registry-result-desc {
+    font-size: 0.82em;
+    color: var(--vscode-descriptionForeground);
+    margin-top: 2px;
   }
 
   .port-picker {
@@ -637,53 +645,28 @@
   </div>
 </div>
 
-<!-- Fetch Soldered Module Section -->
-<div class="section toggleable" id="solderedFetchSection">
-  <h4 onclick="toggleSection('solderedFetchSection')">
-    <span class="arrow">▶</span> Fetch Soldered MicroPython Module
+<!-- Fetch MicroPython library (from micropython-registry, via local worker) -->
+<div class="section toggleable" id="registryFetchSection">
+  <h4 onclick="toggleSection('registryFetchSection')">
+    <span class="arrow">▶</span> Fetch MicroPython library
   </h4>
   <div class="section-content">
-    <button id="refreshModulesBtn" title="Refresh module list from GitHub">↻ Refresh module list</button>
-    <div id="modulesCacheStatus" style="font-size: 0.82em; color: var(--vscode-descriptionForeground); margin-top: 4px; margin-bottom: 8px; display: none;"></div>
-    <div id="modulesLoadingStatus" style="font-size: 0.82em; color: var(--vscode-descriptionForeground); margin-top: 4px; margin-bottom: 8px; display: none;">Fetching from GitHub...</div>
-
-    <label for="moduleSearchInput">Search module:</label>
-    <div class="module-search-wrap">
-      <input type="text" id="moduleSearchInput" placeholder="Loading modules..." disabled />
-      <ul id="moduleSuggestions"></ul>
+    <div style="font-size: 0.82em; color: var(--vscode-descriptionForeground); margin-bottom: 8px;">
+      Test feature — installs from the micropython-registry via a locally running worker (<code>wrangler dev</code> on localhost:8787).
     </div>
 
-    <div class="or-divider">or browse by category</div>
+    <button id="refreshRegistryModulesBtn" title="Refresh module list from registry">↻ Refresh module list</button>
 
-    <label for="categorySelect">Category:</label>
-    <select id="categorySelect">
-      <option value="" disabled selected>Loading categories...</option>
-    </select>
+    <label for="registryModuleSearch">Search module:</label>
+    <input type="text" id="registryModuleSearch" placeholder="Loading modules..." disabled />
 
-    <label for="moduleSelect">Module:</label>
-    <select id="moduleSelect">
-      <option value="" disabled selected>Select a category first</option>
-    </select>
-
-    <div class="buttons-row">
-      <button id="fetchLibraryBtn">
-        <span id="libBtnText">Download Library</span>
-        <span id="libBtnSpinner" style="display: none;">
-          &nbsp;<span class="dot-flash">.</span><span class="dot-flash">.</span><span class="dot-flash">.</span>
-        </span>
-      </button>
-
-      <button id="fetchExamplesBtn">
-        <span id="exBtnText">Download Examples</span>
-        <span id="exBtnSpinner" style="display: none;">
-          &nbsp;<span class="dot-flash">.</span><span class="dot-flash">.</span><span class="dot-flash">.</span>
-        </span>
-      </button>
+    <div id="registryResultsList" class="registry-results">
+      <p class="registry-results-empty">Loading modules...</p>
     </div>
 
-    <button id="fetchAllBtn">
-      <span id="allBtnText">Download Both</span>
-      <span id="allBtnSpinner" style="display: none;">
+    <button id="fetchRegistryBtn">
+      <span id="registryBtnText">Install Module</span>
+      <span id="registryBtnSpinner" style="display: none;">
         &nbsp;<span class="dot-flash">.</span><span class="dot-flash">.</span><span class="dot-flash">.</span>
       </span>
     </button>
@@ -864,16 +847,6 @@ function renderFileTreeUI(nodes) {
   updateButtonStates(document.getElementById('port').value);
 }
 
-function formatCacheAge(timestamp) {
-  const diffMs = Date.now() - timestamp;
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return 'last updated just now';
-  if (diffMin < 60) return `last updated ${diffMin}m ago`;
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `last updated ${diffHr}h ago`;
-  return `last updated ${Math.floor(diffHr / 24)}d ago`;
-}
-
 function saveToggleState() {
   const state = {};
   document.querySelectorAll('.toggleable').forEach(section => {
@@ -919,16 +892,13 @@ window.addEventListener('load', () => {
   restoreToggleState();
   restoreState();
   vscode.postMessage({ command: 'getFirmwareOptions' });
-  vscode.postMessage({ command: 'getCategories' });
-  vscode.postMessage({ command: 'getAllModules' });
+  vscode.postMessage({ command: 'getRegistryModules' });
   startPortScanning();
   // Deferred to the load event (not called synchronously mid-script) because
-  // this reads state variables (allModulesLoaded, ...) that are declared with
-  // let further down in this same script - calling it synchronously here
-  // would hit them before their declaration runs (temporal dead zone),
-  // throwing and aborting every listener registration after that point in
-  // the script (including the message handler that processes setCategories/
-  // setAllModules/populatePorts/etc. - this was silently broken before).
+  // this reads state variables (registryModulesLoaded, ...) that are declared
+  // with let further down in this same script - calling it synchronously here
+  // would hit them before their declaration runs (TDZ), throwing and aborting
+  // every listener registration after that point.
   updateButtonStates(document.getElementById('port').value);
 });
 
@@ -1062,8 +1032,21 @@ window.addEventListener('message', (event) => {
     });
   }
 
-  if (message.command === 'moduleFetchStatus') {
-    setModuleFetchState(message.mode, message.status);
+  if (message.command === 'setRegistryModules' && Array.isArray(message.modules)) {
+    registryModulesAll = message.modules;
+    registryModulesByName = {};
+    registryModulesAll.forEach(pkg => { registryModulesByName[pkg.name] = pkg; });
+    registryModulesLoaded = true;
+    registryModuleSearch.disabled = registryModulesAll.length === 0;
+    registryModuleSearch.placeholder = registryModulesAll.length === 0
+      ? 'No packages found (check registry index)'
+      : 'Search module...';
+    const sorted = [...registryModulesAll].sort((a, b) => (a.display_name || a.name).localeCompare(b.display_name || b.name));
+    renderRegistryResults(sorted);
+  }
+
+  if (message.command === 'registryFetchStatus') {
+    setRegistryFetchState(message.status);
   }
 
   if (message.command === 'populatePorts') {
@@ -1213,13 +1196,6 @@ document.getElementById('deleteAllFilesBtn').addEventListener('click', () => {
   vscode.postMessage({ command: 'deleteAllFiles', port });
 });
 
-// Force-refresh module list from GitHub (bypasses cache)
-document.getElementById('refreshModulesBtn').addEventListener('click', () => {
-  allModulesLoaded = false;
-  updateButtonStates(document.getElementById('port').value);
-  vscode.postMessage({ command: 'getAllModules', force: true });
-});
-
 // Run the selected Python file from the device (uses tree selection)
 document.getElementById('runFileBtn').addEventListener('click', () => {
   const port = document.getElementById('port').value;
@@ -1302,12 +1278,12 @@ document.addEventListener('visibilitychange', () => {
 const PORT_DEPENDENT_BTNS = [
   'uploadAsIsBtn', 'uploadFromPcBtn', 'listFilesBtn',
   'runFileBtn', 'stopCodeBtn', 'serialMonitorBtn', 'openFileBtn', 'deleteFileBtn', 'deleteAllFilesBtn',
-  'flashFromWebBtn', 'flashLocalBtn', 'fetchLibraryBtn', 'fetchExamplesBtn', 'fetchAllBtn'
+  'flashFromWebBtn', 'flashLocalBtn', 'fetchRegistryBtn'
 ];
 
 // IDs of dropdowns/inputs that require a port
 const PORT_DEPENDENT_INPUTS = [
-  'firmwareSelect', 'categorySelect', 'moduleSelect'
+  'firmwareSelect'
 ];
 
 function updateButtonStates(port) {
@@ -1330,9 +1306,8 @@ function updateButtonStates(port) {
   if (openBtn) openBtn.disabled = noPort || !selectedFilePath;
   const delBtn = document.getElementById('deleteFileBtn');
   if (delBtn) delBtn.disabled = noPort || !selectedFilePath;
-  // moduleSearchInput only enabled if port selected AND modules loaded
-  const searchInput = document.getElementById('moduleSearchInput');
-  if (searchInput) searchInput.disabled = noPort || !allModulesLoaded;
+  // registryModuleSearch only enabled if port selected AND registry modules loaded
+  if (registryModuleSearch) registryModuleSearch.disabled = noPort || !registryModulesLoaded;
 }
 
 // Save original titles so we can restore them
@@ -1363,174 +1338,106 @@ document.getElementById('firmwareSelect').addEventListener('change', e => {
   saveState();
 });
 
-// === Soldered Module Fetching ===
+// === micropython-registry module fetching ===
 
-const categorySelect = document.getElementById('categorySelect');
-const moduleSelect = document.getElementById('moduleSelect');
-const moduleSearchInput = document.getElementById('moduleSearchInput');
-const moduleSuggestions = document.getElementById('moduleSuggestions');
+const registryModuleSearch = document.getElementById('registryModuleSearch');
+const registryResultsList = document.getElementById('registryResultsList');
+let registryModulesByName = {};
+let registryModulesAll = [];
+let registryModulesLoaded = false;
+let selectedRegistryModule = null;
 
-let allModulesCache = {};   // { [category]: string[] }
-let allModulesLoaded = false;
-
-function populateModuleSelect(category) {
-  moduleSelect.innerHTML = '<option value="" disabled selected>-- Select module --</option>';
-  (allModulesCache[category] || []).forEach(mod => {
-    const option = document.createElement('option');
-    option.value = mod;
-    option.textContent = mod;
-    moduleSelect.appendChild(option);
-  });
+function registryAuthorName(pkg) {
+  return typeof pkg.author === 'string' ? pkg.author : pkg.author?.name;
 }
 
-function hideSuggestions() {
-  moduleSuggestions.style.display = 'none';
-  moduleSuggestions.innerHTML = '';
-}
+function renderRegistryResults(list) {
+  registryResultsList.innerHTML = '';
 
-function showSuggestions(results) {
-  moduleSuggestions.innerHTML = '';
-  results.forEach(({ mod, cat }) => {
-    const li = document.createElement('li');
-    li.className = 'suggestion-item';
-    li.textContent = `${mod} — ${cat}`;
-    li.addEventListener('mousedown', (e) => {
-      e.preventDefault(); // prevent input blur before click fires
-      // Set category dropdown
-      categorySelect.value = cat;
-      // Populate module dropdown from cache
-      populateModuleSelect(cat);
-      // Set module dropdown
-      moduleSelect.value = mod;
-      // Sync text input
-      moduleSearchInput.value = mod;
-      hideSuggestions();
-    });
-    moduleSuggestions.appendChild(li);
-  });
-  moduleSuggestions.style.display = results.length ? 'block' : 'none';
-}
-
-// When category changes via dropdown, populate modules from cache or fetch
-categorySelect.addEventListener('change', () => {
-  const category = categorySelect.value;
-  moduleSearchInput.value = '';
-  hideSuggestions();
-  if (allModulesCache[category]) {
-    populateModuleSelect(category);
-  } else {
-    moduleSelect.innerHTML = '<option value="" disabled selected>Loading...</option>';
-    vscode.postMessage({ command: 'getModulesForCategory', category });
+  if (!registryModulesLoaded) {
+    const p = document.createElement('p');
+    p.className = 'registry-results-empty';
+    p.textContent = 'Loading modules...';
+    registryResultsList.appendChild(p);
+    return;
   }
-});
+  if (list.length === 0) {
+    const p = document.createElement('p');
+    p.className = 'registry-results-empty';
+    p.textContent = registryModulesAll.length === 0
+      ? 'No packages found (check registry index)'
+      : 'No matches';
+    registryResultsList.appendChild(p);
+    return;
+  }
 
-// When module changes via dropdown, sync text input
-moduleSelect.addEventListener('change', () => {
-  moduleSearchInput.value = moduleSelect.value;
-});
+  list.forEach(pkg => {
+    const item = document.createElement('div');
+    item.className = 'registry-result-item' + (pkg.name === selectedRegistryModule ? ' selected' : '');
 
-// Live fuzzy search as user types
-moduleSearchInput.addEventListener('input', () => {
-  const query = moduleSearchInput.value.trim().toLowerCase();
-  hideSuggestions();
-  if (!query || !allModulesLoaded) return;
+    const title = document.createElement('div');
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'registry-result-name';
+    nameSpan.textContent = pkg.display_name || pkg.name;
+    title.appendChild(nameSpan);
 
-  const results = [];
-  Object.entries(allModulesCache).forEach(([cat, mods]) => {
-    mods.forEach(mod => {
-      const ml = mod.toLowerCase();
-      if (ml.includes(query)) {
-        let score = 0;
-        if (ml === query) score = 2;
-        else if (ml.startsWith(query)) score = 1;
-        results.push({ mod, cat, score });
-      }
+    const authorName = registryAuthorName(pkg);
+    if (authorName) {
+      const authorSpan = document.createElement('span');
+      authorSpan.className = 'registry-result-author';
+      authorSpan.textContent = `by ${authorName}`;
+      title.appendChild(authorSpan);
+    }
+    item.appendChild(title);
+
+    const desc = document.createElement('div');
+    desc.className = 'registry-result-desc';
+    desc.textContent = `${pkg.description || ''} (v${pkg.version})`;
+    item.appendChild(desc);
+
+    item.addEventListener('click', () => {
+      selectedRegistryModule = pkg.name;
+      registryResultsList.querySelectorAll('.registry-result-item.selected').forEach(el => el.classList.remove('selected'));
+      item.classList.add('selected');
     });
+
+    registryResultsList.appendChild(item);
   });
+}
 
-  results.sort((a, b) => b.score - a.score || a.mod.localeCompare(b.mod));
-  showSuggestions(results.slice(0, 10));
+function filterRegistryModules(query) {
+  if (!query) return registryModulesAll;
+  return registryModulesAll.filter(pkg => {
+    const authorName = registryAuthorName(pkg);
+    return pkg.name.toLowerCase().includes(query) ||
+      (pkg.display_name || '').toLowerCase().includes(query) ||
+      (authorName || '').toLowerCase().includes(query);
+  });
+}
+
+registryModuleSearch?.addEventListener('input', () => {
+  const query = registryModuleSearch.value.trim().toLowerCase();
+  const results = filterRegistryModules(query);
+  results.sort((a, b) => (a.display_name || a.name).localeCompare(b.display_name || b.name));
+  renderRegistryResults(results);
 });
 
-// Hide suggestions when input loses focus
-moduleSearchInput.addEventListener('blur', () => {
-  setTimeout(hideSuggestions, 150);
-});
-
-const fetchModule = (mode) => {
-  const sensor = moduleSelect?.value;
+document.getElementById('fetchRegistryBtn')?.addEventListener('click', () => {
+  const name = selectedRegistryModule;
   const port = document.getElementById('port')?.value;
-  if (!sensor || !port) return;
-  vscode.postMessage({ command: 'fetchModule', sensor, port, mode });
-};
-
-document.getElementById('fetchLibraryBtn')?.addEventListener('click', () => {
-  setModuleFetchState('library', 'start');
-  fetchModule('library');
+  if (!name || !port) return;
+  setRegistryFetchState('start');
+  vscode.postMessage({ command: 'fetchRegistryModule', name, port });
 });
 
-document.getElementById('fetchExamplesBtn')?.addEventListener('click', () => {
-  setModuleFetchState('examples', 'start');
-  fetchModule('examples');
-});
-
-document.getElementById('fetchAllBtn')?.addEventListener('click', () => {
-  setModuleFetchState('all', 'start');
-  fetchModule('all');
-});
-
-// Handle categories and modules from backend
-window.addEventListener('message', event => {
-  const message = event.data;
-
-  if (message.command === 'setCategories' && Array.isArray(message.categories)) {
-    categorySelect.innerHTML = '<option value="" disabled selected>-- Select category --</option>';
-    message.categories.forEach(cat => {
-      const option = document.createElement('option');
-      option.value = cat;
-      option.textContent = cat;
-      categorySelect.appendChild(option);
-    });
-  }
-
-  if (message.command === 'setModulesForCategory' && Array.isArray(message.modules)) {
-    moduleSelect.innerHTML = '<option value="" disabled selected>-- Select module --</option>';
-    message.modules.forEach(mod => {
-      const option = document.createElement('option');
-      option.value = mod;
-      option.textContent = mod;
-      moduleSelect.appendChild(option);
-    });
-    if (message.modules.length === 1) {
-      moduleSelect.value = message.modules[0];
-      moduleSearchInput.value = message.modules[0];
-    }
-  }
-
-  if (message.command === 'setAllModulesLoading') {
-    allModulesLoaded = false;
-    moduleSearchInput.placeholder = 'Loading modules...';
-    moduleSearchInput.disabled = true;
-    document.getElementById('modulesCacheStatus').style.display = 'none';
-    document.getElementById('modulesLoadingStatus').style.display = 'block';
-  }
-
-  if (message.command === 'setAllModules' && message.modules) {
-    allModulesCache = message.modules;
-    allModulesLoaded = true;
-    moduleSearchInput.placeholder = 'Type to search modules...';
-    const port = document.getElementById('port').value;
-    moduleSearchInput.disabled = !port;
-
-    document.getElementById('modulesLoadingStatus').style.display = 'none';
-    const cacheStatus = document.getElementById('modulesCacheStatus');
-    if (message.cachedAt) {
-      cacheStatus.textContent = 'Module list ' + formatCacheAge(message.cachedAt);
-      cacheStatus.style.display = 'block';
-    } else {
-      cacheStatus.style.display = 'none';
-    }
-  }
+document.getElementById('refreshRegistryModulesBtn')?.addEventListener('click', () => {
+  registryModulesLoaded = false;
+  selectedRegistryModule = null;
+  registryModuleSearch.value = '';
+  registryModuleSearch.disabled = true;
+  registryModuleSearch.placeholder = 'Loading modules...';
+  renderRegistryResults([]);
+  vscode.postMessage({ command: 'getRegistryModules' });
 });
 
 function setUploadState(state) {
@@ -1598,35 +1505,28 @@ function manualResetFlashingUI() {
   if (bar) bar.style.width = '0%';
 }
 
-function setModuleFetchState(mode, state) {
-  const map = {
-    library: ['libBtnText', 'libBtnSpinner', 'fetchLibraryBtn', 'Download Library'],
-    examples: ['exBtnText', 'exBtnSpinner', 'fetchExamplesBtn', 'Download Examples'],
-    all: ['allBtnText', 'allBtnSpinner', 'fetchAllBtn', 'Download Both']
-  };
-
-  const [textId, spinnerId, btnId, defaultText] = map[mode];
-  const text = document.getElementById(textId);
-  const spinner = document.getElementById(spinnerId);
-  const btn = document.getElementById(btnId);
+function setRegistryFetchState(state) {
+  const text = document.getElementById('registryBtnText');
+  const spinner = document.getElementById('registryBtnSpinner');
+  const btn = document.getElementById('fetchRegistryBtn');
 
   if (state === 'start') {
     btn.disabled = true;
-    text.textContent = 'Downloading';
+    text.textContent = 'Installing';
     spinner.style.display = 'inline';
   } else if (state === 'done') {
     text.textContent = 'Success!';
     spinner.style.display = 'none';
     setTimeout(() => {
       btn.disabled = false;
-      text.textContent = defaultText;
+      text.textContent = 'Install Module';
     }, 1500);
   } else if (state === 'error') {
     text.textContent = 'Failed!';
     spinner.style.display = 'none';
     setTimeout(() => {
       btn.disabled = false;
-      text.textContent = defaultText;
+      text.textContent = 'Install Module';
     }, 1500);
   }
 }

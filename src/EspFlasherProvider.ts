@@ -9,7 +9,7 @@ import { startSerialMonitor, handleRunPythonFile, handleStopRunningCode, closeAl
 import { handleFlashFromWeb, handleFlashFirmware, fetchFirmwareList } from './handlers/flashHandler';
 import { handleListFiles, handleDeleteFile, handleDeleteAllFiles } from './handlers/fileHandler';
 import { handleUploadPythonAsIs, handleUploadPythonFromPc, handleOpenFileFromDevice } from './handlers/uploadHandler';
-import { handleFetchModule, handleGetCategories, handleGetModulesForCategory, handleGetAllModules } from './handlers/moduleHandler';
+import { handleGetRegistryModules, handleFetchRegistryModule } from './handlers/moduleHandler';
 import { execMpremote } from './utils/execUtils';
 
 const IGNORED_PORT_PATTERNS = ['debug-console', 'Bluetooth-Incoming-Port'];
@@ -112,7 +112,7 @@ export class EspFlasherViewProvider implements vscode.WebviewViewProvider {
       }
 
       // Guard: most commands need a port
-      const needsPort = !['flashFirmware', 'getPorts', 'getCategories', 'getModulesForCategory', 'getAllModules', 'getFirmwareOptions', 'requestRefresh', 'noop', 'openWebsite', 'openGithub'].includes(message.command);
+      const needsPort = !['flashFirmware', 'getPorts', 'getRegistryModules', 'getFirmwareOptions', 'requestRefresh', 'noop', 'openWebsite', 'openGithub'].includes(message.command);
       if (needsPort && (!port || typeof port !== 'string' || port.trim() === '')) {
         this.outputChannel.appendLine(`[WARN] Ignoring ${message.command} - no port provided yet.`);
         return;
@@ -184,20 +184,12 @@ export class EspFlasherViewProvider implements vscode.WebviewViewProvider {
           await handleUploadPythonFromPc(ctx, message);
           break;
 
-        case 'fetchModule':
-          await handleFetchModule(ctx, message);
+        case 'getRegistryModules':
+          await handleGetRegistryModules(ctx);
           break;
 
-        case 'getCategories':
-          await handleGetCategories(ctx);
-          break;
-
-        case 'getModulesForCategory':
-          await handleGetModulesForCategory(ctx, message);
-          break;
-
-        case 'getAllModules':
-          await handleGetAllModules(ctx, message);
+        case 'fetchRegistryModule':
+          await handleFetchRegistryModule(ctx, message);
           break;
 
         case 'deleteFile':
