@@ -922,6 +922,14 @@ window.addEventListener('load', () => {
   vscode.postMessage({ command: 'getCategories' });
   vscode.postMessage({ command: 'getAllModules' });
   startPortScanning();
+  // Deferred to the load event (not called synchronously mid-script) because
+  // this reads state variables (allModulesLoaded, ...) that are declared with
+  // let further down in this same script - calling it synchronously here
+  // would hit them before their declaration runs (temporal dead zone),
+  // throwing and aborting every listener registration after that point in
+  // the script (including the message handler that processes setCategories/
+  // setAllModules/populatePorts/etc. - this was silently broken before).
+  updateButtonStates(document.getElementById('port').value);
 });
 
 window.addEventListener('focus', () => {
@@ -1332,9 +1340,6 @@ PORT_DEPENDENT_BTNS.forEach(id => {
   const btn = document.getElementById(id);
   if (btn) btn.setAttribute('data-title', btn.title);
 });
-
-// Run on load
-updateButtonStates(document.getElementById('port').value);
 
 // Track COM port selection changes and update state
 document.getElementById('port').addEventListener('change', e => {
