@@ -127,7 +127,15 @@
   .app-logo {
     width: 32px;
     height: 32px;
-    filter: invert(1);
+    background-color: var(--vscode-foreground);
+    -webkit-mask-image: var(--mp-icon-url);
+    -webkit-mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-image: var(--mp-icon-url);
+    mask-size: contain;
+    mask-repeat: no-repeat;
+    mask-position: center;
   }
 
   .app-title {
@@ -135,6 +143,109 @@
     font-weight: bold;
     margin: 0;
     color: var(--vscode-foreground);
+  }
+
+  .brand-mark-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: auto;
+    flex-shrink: 0;
+    padding: 5px 10px;
+    border-radius: 5px;
+    background: #510C76;
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+  }
+
+  .brand-mark-badge:hover {
+    opacity: 0.85;
+  }
+
+  .brand-mark {
+    width: 108px;
+    height: 22px;
+    background-color: #ffffff;
+    -webkit-mask-image: var(--soldered-logo-url);
+    -webkit-mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-image: var(--soldered-logo-url);
+    mask-size: contain;
+    mask-repeat: no-repeat;
+    mask-position: center;
+  }
+
+  .app-footer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 24px;
+    padding: 16px 14px;
+    border-radius: 6px;
+    background: #510C76;
+    font-size: 1em;
+    color: #ffffff;
+  }
+
+  .footer-logo {
+    height: 22px;
+    width: 108px;
+    flex-shrink: 0;
+    background-color: #ffffff;
+    -webkit-mask-image: var(--soldered-logo-url);
+    -webkit-mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    -webkit-mask-position: left center;
+    mask-image: var(--soldered-logo-url);
+    mask-size: contain;
+    mask-repeat: no-repeat;
+    mask-position: left center;
+  }
+
+  .footer-text {
+    color: rgba(255, 255, 255, 0.8);
+  }
+
+  .app-footer a {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: #ffffff;
+    text-decoration: none;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .app-footer a:hover {
+    opacity: 0.85;
+  }
+
+  .footer-sep {
+    opacity: 0.5;
+    margin: 0 2px;
+  }
+
+  #footerGithubLink {
+    font-size: 1.15em;
+  }
+
+  .footer-github-icon {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
+  }
+
+  .inline-link {
+    color: var(--vscode-textLink-foreground);
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .inline-link:hover {
+    opacity: 0.85;
   }
 
 
@@ -360,8 +471,11 @@
 <body>
 
 <div class="app-header">
-  <img src="{{mpIconUri}}" alt="MP Icon" class="app-logo">
-  <h1 class="app-title">Soldered MicroPython Helper</h1>
+  <div class="app-logo" role="img" aria-label="MicroPython Icon" style="--mp-icon-url: url('{{mpIconUri}}');"></div>
+  <h1 class="app-title">MicroPython Helper by Soldered</h1>
+  <div class="brand-mark-badge" id="brandLogo" role="button" aria-label="Visit soldered.com" title="Visit soldered.com">
+    <div class="brand-mark" style="--soldered-logo-url: url('{{solderedIconUri}}');"></div>
+  </div>
 </div>
 
 <!-- Info & Instructions Section — collapsed by default -->
@@ -372,7 +486,7 @@
   <div class="section-content">
 
     <p class="intro-text" style="margin-top: 0;">
-      <strong>Soldered MicroPython Helper</strong> is a Visual Studio Code extension that helps you get started with your MicroPython projects using a friendly graphical interface.
+      <strong>MicroPython Helper by <a id="infoSolderedLink" class="inline-link">Soldered</a></strong> is a Visual Studio Code extension that helps you get started with your MicroPython projects using a friendly graphical interface.
     </p>
     <p class="intro-text">
       <em>Note:</em> This extension is <strong>experimental</strong> and is actively being developed. It acts as a graphical wrapper around <code>mpremote</code> commands, making them easier to use.
@@ -574,6 +688,20 @@
       </span>
     </button>
   </div>
+</div>
+
+<div class="app-footer">
+  <a id="footerSolderedLink">
+    <span class="footer-text">By</span>
+    <div class="footer-logo" role="img" aria-label="Soldered" style="--soldered-logo-url: url('{{solderedIconUri}}');"></div>
+  </a>
+  <span class="footer-sep">·</span>
+  <a id="footerGithubLink">
+    <svg class="footer-github-icon" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+      <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/>
+    </svg>
+    GitHub
+  </a>
 </div>
 
 <script>
@@ -840,6 +968,22 @@ document.getElementById('stopCodeBtn').addEventListener('click', () => {
 // 1) Refresh button -> ask backend to rescan ports
 document.getElementById('refreshPortsBtn').addEventListener('click', () => {
   vscode.postMessage({ command: 'getPorts' });
+});
+
+document.getElementById('brandLogo').addEventListener('click', () => {
+  vscode.postMessage({ command: 'openWebsite' });
+});
+
+document.getElementById('infoSolderedLink').addEventListener('click', () => {
+  vscode.postMessage({ command: 'openWebsite' });
+});
+
+document.getElementById('footerSolderedLink').addEventListener('click', () => {
+  vscode.postMessage({ command: 'openWebsite' });
+});
+
+document.getElementById('footerGithubLink').addEventListener('click', () => {
+  vscode.postMessage({ command: 'openGithub' });
 });
 
 

@@ -1,6 +1,6 @@
 {
   "name": "soldered-micropython-helper",
-  "displayName": "Soldered MicroPython Helper",
+  "displayName": "MicroPython Helper by Soldered",
   "publisher": "solderedelectronics",
   "description": "A MicroPython-focused helper for working with ESP-based boards directly inside Visual Studio Code.",
   "version": "0.3.0",
@@ -81,7 +81,7 @@
       "activitybar": [
         {
           "id": "espFlasherView",
-          "title": "Soldered MicroPython Helper",
+          "title": "MicroPython Helper by Soldered",
           "icon": "resources/mp.svg"
         }
       ]

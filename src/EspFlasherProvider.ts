@@ -112,7 +112,7 @@ export class EspFlasherViewProvider implements vscode.WebviewViewProvider {
       }
 
       // Guard: most commands need a port
-      const needsPort = !['flashFirmware', 'getPorts', 'getCategories', 'getModulesForCategory', 'getAllModules', 'getFirmwareOptions', 'requestRefresh', 'noop'].includes(message.command);
+      const needsPort = !['flashFirmware', 'getPorts', 'getCategories', 'getModulesForCategory', 'getAllModules', 'getFirmwareOptions', 'requestRefresh', 'noop', 'openWebsite', 'openGithub'].includes(message.command);
       if (needsPort && (!port || typeof port !== 'string' || port.trim() === '')) {
         this.outputChannel.appendLine(`[WARN] Ignoring ${message.command} - no port provided yet.`);
         return;
@@ -247,6 +247,14 @@ export class EspFlasherViewProvider implements vscode.WebviewViewProvider {
         case 'noop':
           break;
 
+        case 'openWebsite':
+          vscode.env.openExternal(vscode.Uri.parse('https://soldered.com'));
+          break;
+
+        case 'openGithub':
+          vscode.env.openExternal(vscode.Uri.parse('https://github.com/SolderedElectronics'));
+          break;
+
         default:
           this.outputChannel.appendLine(`[INFO] Unknown command from webview: ${message.command}`);
       }
@@ -262,7 +270,11 @@ export class EspFlasherViewProvider implements vscode.WebviewViewProvider {
     const mpIconUri = this._view?.webview.asWebviewUri(
       vscode.Uri.joinPath(this.context.extensionUri, 'resources', 'mp.svg')
     );
-    html = html.replace('{{mpIconUri}}', mpIconUri?.toString() || '');
+    const solderedIconUri = this._view?.webview.asWebviewUri(
+      vscode.Uri.joinPath(this.context.extensionUri, 'resources', 'soldered-logo.svg')
+    );
+    html = html.split('{{mpIconUri}}').join(mpIconUri?.toString() || '');
+    html = html.split('{{solderedIconUri}}').join(solderedIconUri?.toString() || '');
     return html;
   }
 }

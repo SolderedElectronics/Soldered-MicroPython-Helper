@@ -1,4 +1,4 @@
-# Soldered MicroPython Helper
+# MicroPython Helper by Soldered
 
 A MicroPython-focused extension for Visual Studio Code designed for working with ESP and RP2-based boards. Flash firmware, upload scripts, monitor serial output, and fetch Soldered libraries — all from within the editor.
 
@@ -56,7 +56,7 @@ After installing the driver, replug your board.
 
 1. Open Visual Studio Code.
 2. Go to the Extensions panel (`Ctrl+Shift+X`).
-3. Search for `Soldered MicroPython Helper`.
+3. Search for `MicroPython Helper by Soldered`.
 4. Click **Install**.
 
 Alternatively, [install directly from the Marketplace](https://marketplace.visualstudio.com/items?itemName=SolderedElectronics.soldered-micropython-helper).
