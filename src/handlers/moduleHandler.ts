@@ -2,15 +2,14 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as os from 'os';
 import * as https from 'https';
-import * as http from 'http';
 import { HandlerContext } from '../types';
 import { execCommand } from '../utils/execUtils';
 import { downloadFile } from './flashHandler';
 import { closeAllSerial } from './serialHandler';
 
-// micropython-registry integration (test-only: worker is run locally via `wrangler dev`, not deployed yet)
+// micropython-registry integration
 const REGISTRY_INDEX_URL = 'https://raw.githubusercontent.com/SolderedElectronics/micropython-registry/dist/index.json';
-const REGISTRY_WORKER_URL = 'http://localhost:8787';
+const REGISTRY_WORKER_URL = 'https://packages.soldered.com';
 
 /**
  * Fetches the micropython-registry's built index and returns the package list
@@ -43,9 +42,8 @@ export async function handleGetRegistryModules(ctx: HandlerContext): Promise<voi
 }
 
 /**
- * Fetches a package's install manifest (mip package.json shape) from the local
+ * Fetches a package's install manifest (mip package.json shape) from the
  * micropython-registry worker and uploads its files to the device via fs cp.
- * Test-only: expects `wrangler dev` running locally, not a deployed worker.
  */
 export async function handleFetchRegistryModule(ctx: HandlerContext, message: any): Promise<void> {
   const { name, port } = message;
@@ -60,7 +58,7 @@ export async function handleFetchRegistryModule(ctx: HandlerContext, message: an
   const manifestUrl = `${REGISTRY_WORKER_URL}/package/latest/${name}/latest.json`;
   try {
     const manifest: any = await new Promise((resolve, reject) => {
-      http.get(manifestUrl, res => {
+      https.get(manifestUrl, res => {
         let data = '';
         res.on('data', chunk => data += chunk);
         res.on('end', () => {
