@@ -80,7 +80,7 @@ export const mpremoteQueue = new SerialQueue();
  */
 export function execCommand(command: string, outputChannel?: OutputChannel): Promise<void> {
   return mpremoteQueue.enqueue(() => new Promise<void>((resolve, reject) => {
-    const child = spawn(command, [], { shell: true, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(command, [], { shell: true, detached: true, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
     mpremoteQueue.setCurrentProcess(child);
 
     let stderr = '';
@@ -111,7 +111,7 @@ export function execCommand(command: string, outputChannel?: OutputChannel): Pro
  */
 export function execMpremote(command: string): Promise<string> {
   return mpremoteQueue.enqueue(() => new Promise<string>((resolve, reject) => {
-    const child = spawn(command, [], { shell: true, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(command, [], { shell: true, detached: true, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
     mpremoteQueue.setCurrentProcess(child);
 
     let stdout = '';
@@ -145,7 +145,7 @@ export function execMpremote(command: string): Promise<string> {
  */
 export function execUnqueued(command: string, timeoutMs = 5000): Promise<string> {
   return new Promise<string>((resolve, reject) => {
-    const child = spawn(command, [], { shell: true, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(command, [], { shell: true, detached: true, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = '';
     let stderr = '';
     child.stdout?.on('data', (d: Buffer) => { stdout += d.toString(); });
@@ -166,7 +166,7 @@ export function execUnqueued(command: string, timeoutMs = 5000): Promise<string>
  */
 export function execWithTimeout(cmd: string, ms: number): Promise<void> {
   return new Promise<void>((resolve, reject) => {
-    const child = spawn(cmd, [], { shell: true, detached: true, stdio: 'ignore' });
+    const child = spawn(cmd, [], { shell: true, detached: true, windowsHide: true, stdio: 'ignore' });
     const t = setTimeout(() => { killGroup(child); resolve(); }, ms);
     child.on('close', (code) => {
       clearTimeout(t);

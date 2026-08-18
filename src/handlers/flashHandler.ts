@@ -110,7 +110,7 @@ export async function fetchFirmwareList(
 function streamFlashWithProgress(command: string, ctx: HandlerContext): Promise<void> {
   return new Promise((resolve, reject) => {
     ctx.outputChannel.appendLine(`Executing: ${command}`);
-    const child = spawn(command, [], { shell: true });
+    const child = spawn(command, [], { shell: true, windowsHide: true });
 
     const handleChunk = (data: string) => {
       ctx.outputChannel.append(data);
