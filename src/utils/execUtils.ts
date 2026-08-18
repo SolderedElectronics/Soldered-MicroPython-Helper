@@ -1,4 +1,4 @@
-import { spawn, exec, ChildProcess } from 'child_process';
+import { spawn, execFile, ChildProcess } from 'child_process';
 import type { OutputChannel } from 'vscode';
 
 const MPREMOTE_TIMEOUT_MS = 8000;
@@ -12,7 +12,7 @@ const MPREMOTE_TIMEOUT_MS = 8000;
 function killGroup(child: ChildProcess): void {
   if (child.pid) {
     if (process.platform === 'win32') {
-      exec(`taskkill /pid ${child.pid} /T /F`, () => {});
+      execFile('taskkill', ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true }, () => {});
     } else {
       try { process.kill(-child.pid, 'SIGKILL'); } catch {}
     }
