@@ -46,6 +46,7 @@ print(json.dumps(tree('/')))
     ctx.postMessage({ command: 'displayFiles', files });
   } catch (err: any) {
     ctx.outputChannel.appendLine(`[WARN] Failed to list files: ${err.message}`);
+    vscode.window.showErrorMessage(`Failed to list files: ${err.message}`);
     ctx.postMessage({ command: 'displayFiles', files: [] });
   }
 }
