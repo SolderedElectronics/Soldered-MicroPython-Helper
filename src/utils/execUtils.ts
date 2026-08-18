@@ -1,16 +1,21 @@
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, exec, ChildProcess } from 'child_process';
 import type { OutputChannel } from 'vscode';
 
 const MPREMOTE_TIMEOUT_MS = 8000;
 
 /**
- * Kills the process and its entire process group (children included).
- * Using detached spawn + process.kill(-pid) ensures grandchildren (e.g. mpremote
- * spawned by a shell) are also killed — plain child.kill() only kills the shell.
+ * Kills the process and its children (e.g. mpremote spawned by the shell).
+ * POSIX: negative pid targets the whole process group (requires detached spawn).
+ * Windows has no process-group signal equivalent, so taskkill /T walks the
+ * PID's process tree instead.
  */
 function killGroup(child: ChildProcess): void {
   if (child.pid) {
-    try { process.kill(-child.pid, 'SIGKILL'); } catch {}
+    if (process.platform === 'win32') {
+      exec(`taskkill /pid ${child.pid} /T /F`, () => {});
+    } else {
+      try { process.kill(-child.pid, 'SIGKILL'); } catch {}
+    }
   }
   try { child.kill('SIGKILL'); } catch {}
 }
@@ -75,7 +80,7 @@ export const mpremoteQueue = new SerialQueue();
  */
 export function execCommand(command: string, outputChannel?: OutputChannel): Promise<void> {
   return mpremoteQueue.enqueue(() => new Promise<void>((resolve, reject) => {
-    const child = spawn('sh', ['-c', command], { detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(command, [], { shell: true, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
     mpremoteQueue.setCurrentProcess(child);
 
     let stderr = '';
@@ -106,7 +111,7 @@ export function execCommand(command: string, outputChannel?: OutputChannel): Pro
  */
 export function execMpremote(command: string): Promise<string> {
   return mpremoteQueue.enqueue(() => new Promise<string>((resolve, reject) => {
-    const child = spawn('sh', ['-c', command], { detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(command, [], { shell: true, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
     mpremoteQueue.setCurrentProcess(child);
 
     let stdout = '';
@@ -140,7 +145,7 @@ export function execMpremote(command: string): Promise<string> {
  */
 export function execUnqueued(command: string, timeoutMs = 5000): Promise<string> {
   return new Promise<string>((resolve, reject) => {
-    const child = spawn('sh', ['-c', command], { detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(command, [], { shell: true, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = '';
     let stderr = '';
     child.stdout?.on('data', (d: Buffer) => { stdout += d.toString(); });
@@ -161,7 +166,7 @@ export function execUnqueued(command: string, timeoutMs = 5000): Promise<string>
  */
 export function execWithTimeout(cmd: string, ms: number): Promise<void> {
   return new Promise<void>((resolve, reject) => {
-    const child = spawn('sh', ['-c', cmd], { detached: true, stdio: 'ignore' });
+    const child = spawn(cmd, [], { shell: true, detached: true, stdio: 'ignore' });
     const t = setTimeout(() => { killGroup(child); resolve(); }, ms);
     child.on('close', (code) => {
       clearTimeout(t);
