@@ -4,6 +4,16 @@ import type { OutputChannel } from 'vscode';
 const MPREMOTE_TIMEOUT_MS = 8000;
 
 /**
+ * detached is only needed on POSIX for the negative-pid process-group kill.
+ * On Windows it forces the DETACHED_PROCESS creation flag, which conflicts
+ * with CREATE_NO_WINDOW (windowsHide) at the Win32 API level and silently
+ * defeats windowsHide, leaving a console window visible. taskkill /T (used
+ * for Windows group-kill) walks the PID tree regardless of detachment, so
+ * it doesn't need this.
+ */
+const DETACHED = process.platform !== 'win32';
+
+/**
  * Kills the process and its children (e.g. mpremote spawned by the shell).
  * POSIX: negative pid targets the whole process group (requires detached spawn).
  * Windows has no process-group signal equivalent, so taskkill /T walks the
@@ -80,7 +90,7 @@ export const mpremoteQueue = new SerialQueue();
  */
 export function execCommand(command: string, outputChannel?: OutputChannel): Promise<void> {
   return mpremoteQueue.enqueue(() => new Promise<void>((resolve, reject) => {
-    const child = spawn(command, [], { shell: true, detached: true, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(command, [], { shell: true, detached: DETACHED, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
     mpremoteQueue.setCurrentProcess(child);
 
     let stderr = '';
@@ -111,7 +121,7 @@ export function execCommand(command: string, outputChannel?: OutputChannel): Pro
  */
 export function execMpremote(command: string): Promise<string> {
   return mpremoteQueue.enqueue(() => new Promise<string>((resolve, reject) => {
-    const child = spawn(command, [], { shell: true, detached: true, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(command, [], { shell: true, detached: DETACHED, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
     mpremoteQueue.setCurrentProcess(child);
 
     let stdout = '';
@@ -145,7 +155,7 @@ export function execMpremote(command: string): Promise<string> {
  */
 export function execUnqueued(command: string, timeoutMs = 5000): Promise<string> {
   return new Promise<string>((resolve, reject) => {
-    const child = spawn(command, [], { shell: true, detached: true, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(command, [], { shell: true, detached: DETACHED, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = '';
     let stderr = '';
     child.stdout?.on('data', (d: Buffer) => { stdout += d.toString(); });
@@ -166,7 +176,7 @@ export function execUnqueued(command: string, timeoutMs = 5000): Promise<string>
  */
 export function execWithTimeout(cmd: string, ms: number): Promise<void> {
   return new Promise<void>((resolve, reject) => {
-    const child = spawn(cmd, [], { shell: true, detached: true, windowsHide: true, stdio: 'ignore' });
+    const child = spawn(cmd, [], { shell: true, detached: DETACHED, windowsHide: true, stdio: 'ignore' });
     const t = setTimeout(() => { killGroup(child); resolve(); }, ms);
     child.on('close', (code) => {
       clearTimeout(t);
