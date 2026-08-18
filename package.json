@@ -51,7 +51,7 @@
       "properties": {
         "mp.saveToDeviceOnSave": {
           "type": "boolean",
-          "default": true,
+          "default": false,
           "description": "When saving a Python file, also upload it to the connected MicroPython device (using the last selected port). If disabled, you will be prompted to choose where to save the file (PC, device, or both)."
         },
         "mp.savePromptMode": {

@@ -40,7 +40,7 @@ export function activate(context: vscode.ExtensionContext) {
       }
 
       const cfg              = vscode.workspace.getConfiguration();
-      const saveToDevice     = cfg.get<boolean>('mp.saveToDeviceOnSave', true);
+      const saveToDevice     = cfg.get<boolean>('mp.saveToDeviceOnSave', false);
       const saveAsMain       = cfg.get<boolean>('mp.saveDeviceAsMain', false);
       const savePromptMode   = cfg.get<string>('mp.savePromptMode', 'ask');
 
