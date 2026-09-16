@@ -14,7 +14,14 @@ export function activate(context: vscode.ExtensionContext) {
   activeProvider = provider;
 
   context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider('espFlasherWebview', provider)
+    vscode.window.registerWebviewViewProvider('espFlasherWebview', provider, {
+      // Without this, VS Code unloads the webview's page whenever it's
+      // hidden (e.g. switching sidebar tabs) and reloads it from scratch
+      // when shown again — wiping the port/firmware selection and file tree
+      // back to empty (the save/restoreState plumbing only papers over part
+      // of this).
+      webviewOptions: { retainContextWhenHidden: true }
+    })
   );
 
   const out = provider.getOutputChannel();
