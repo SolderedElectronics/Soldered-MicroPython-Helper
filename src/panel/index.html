@@ -1088,6 +1088,13 @@ window.addEventListener('message', (event) => {
 
     if (toSelect) {
       select.value = toSelect;
+      // A newly (re)appeared port keeping the same path string as before
+      // (common with WCH USB-serial chips reusing device names) means a
+      // different physical board may now be on the other end - don't let a
+      // stale "MicroPython installed" banner from the previous board linger
+      // until checkMicroPython's fresh answer comes back.
+      const banner = document.getElementById('mpInstalledBanner');
+      if (banner) banner.style.display = 'none';
       vscode.postMessage({ command: 'noop', port: toSelect });
       vscode.postMessage({ command: 'checkMicroPython', port: toSelect });
       stopPortScanning();
