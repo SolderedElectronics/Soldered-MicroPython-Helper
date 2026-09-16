@@ -14,6 +14,13 @@ import { closeAllSerial } from './serialHandler';
  * ESP32-C2/C3/C6 and S3 use 0x0; original ESP32 and S2 use 0x1000.
  */
 function getFlashAddress(firmwareName: string): string {
+  // SOLDERED_NULA_MINI is ESP32-C6 based, but its filename doesn't carry a
+  // chip suffix like the ESP32_GENERIC_* boards do, so it needs an explicit
+  // override to avoid falling back to the wrong (0x1000) address.
+  if (/^SOLDERED_NULA_MINI-/i.test(firmwareName)) return '0x0';
+  // Inkplate 13SPECTRA/7SPECTRA firmware is ESP32-S3 based, but its filename
+  // has no chip suffix either.
+  if (/^inkplate13spectra-firmware/i.test(firmwareName)) return '0x0';
   return /esp32[_-].*(c2|c3|c6|s3)/i.test(firmwareName) ? '0x0' : '0x1000';
 }
 
@@ -48,9 +55,9 @@ export async function fetchFirmwareList(
 ): Promise<{ name: string; url: string; boardType: string; version: string }[]> {
   const baseUrl = 'https://micropython.org';
 
-  const esp32Slugs  = ['ESP32_GENERIC', 'ESP32_GENERIC_C3', 'ESP32_GENERIC_C2', 'ESP32_GENERIC_C6', 'ESP32_GENERIC_S2', 'ESP32_GENERIC_S3'];
+  const esp32Slugs  = ['ESP32_GENERIC', 'ESP32_GENERIC_C3', 'ESP32_GENERIC_C2', 'ESP32_GENERIC_C6', 'ESP32_GENERIC_S2', 'ESP32_GENERIC_S3', 'SOLDERED_NULA_MINI'];
   const rp2040Slugs = ['ARDUINO_NANO_RP2040_CONNECT', 'SPARKFUN_PROMICRO', 'RPI_PICO'];
-  const rp2350Slugs = ['RPI_PICO2', 'RPI_PICO2_W', 'SPARKFUN_PROMICRO_RP2350'];
+  const rp2350Slugs = ['RPI_PICO2', 'RPI_PICO2_W', 'SPARKFUN_PROMICRO_RP2350', 'SOLDERED_NULA_MAX_RP2350'];
 
   const allFirmwares: { name: string; url: string; boardType: string; version: string }[] = [];
 
@@ -94,10 +101,50 @@ export async function fetchFirmwareList(
     });
   };
 
+  // Inkplate firmware isn't versioned/released on micropython.org - it's built
+  // and committed straight into the Inkplate-micropython repo's firmware/
+  // folder, so fetch the current .bin files from there directly (via the
+  // GitHub API, which resolves the default branch for us) instead of scraping
+  // a fixed URL, so this always picks up the latest firmware on git.
+  const fetchInkplateFirmware = () => {
+    return new Promise<void>((resolve) => {
+      https.get(
+        'https://api.github.com/repos/SolderedElectronics/Inkplate-micropython/contents/firmware',
+        { headers: { 'User-Agent': 'Mozilla/5.0' } },
+        res => {
+          let data = '';
+          res.on('data', chunk => data += chunk);
+          res.on('end', () => {
+            try {
+              const entries: { name: string; download_url: string | null; sha: string; type: string }[] = JSON.parse(data);
+              for (const entry of entries) {
+                if (entry.type === 'file' && entry.name.endsWith('.bin') && entry.download_url) {
+                  allFirmwares.push({
+                    name: entry.name,
+                    url: entry.download_url,
+                    boardType: 'Inkplate',
+                    version: entry.sha.slice(0, 7),
+                  });
+                }
+              }
+            } catch (err: any) {
+              ctx.outputChannel.appendLine(`[WARN] Failed to parse Inkplate firmware list: ${err.message}`);
+            }
+            resolve();
+          });
+        }
+      ).on('error', err => {
+        ctx.outputChannel.appendLine(`[WARN] Failed to fetch Inkplate firmware list: ${err.message}`);
+        resolve();
+      });
+    });
+  };
+
   await Promise.all([
     ...esp32Slugs.map(slug  => fetchForSlug(slug, '.bin', 'ESP32')),
     ...rp2040Slugs.map(slug => fetchForSlug(slug, '.uf2', 'RP2040')),
     ...rp2350Slugs.map(slug => fetchForSlug(slug, '.uf2', 'RP2350')),
+    fetchInkplateFirmware(),
   ]);
 
   return allFirmwares;
@@ -106,11 +153,16 @@ export async function fetchFirmwareList(
 /**
  * Spawns esptool and streams its output, parsing progress percentage and
  * sending flashProgress messages to the webview as writing proceeds.
+ *
+ * Uses array-form args (no shell) so esptoolPath/port/file paths never need
+ * manual quoting - a shell:true string built with template interpolation
+ * (the previous approach) breaks outright on inputs containing spaces, e.g.
+ * the very common Windows install path "C:\Program Files\esptool\esptool.exe".
  */
-function streamFlashWithProgress(command: string, ctx: HandlerContext): Promise<void> {
+function streamFlashWithProgress(esptoolPath: string, args: string[], ctx: HandlerContext): Promise<void> {
   return new Promise((resolve, reject) => {
-    ctx.outputChannel.appendLine(`Executing: ${command}`);
-    const child = spawn(command, [], { shell: true, windowsHide: true });
+    ctx.outputChannel.appendLine(`Executing: ${esptoolPath} ${args.join(' ')}`);
+    const child = spawn(esptoolPath, args, { windowsHide: true });
 
     const handleChunk = (data: string) => {
       ctx.outputChannel.append(data);
