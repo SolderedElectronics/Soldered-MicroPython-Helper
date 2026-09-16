@@ -5,7 +5,7 @@
   "author": "Soldered Electronics",
   "license": "MIT",
   "description": "A MicroPython-focused helper for working with ESP-based boards directly inside Visual Studio Code.",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "engines": {
     "vscode": "^1.100.0"
   },
