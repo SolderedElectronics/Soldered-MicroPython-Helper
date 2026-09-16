@@ -45,17 +45,34 @@ class SerialQueue {
   }
 
   /**
-   * Kills the currently running process group and rejects all pending queue items.
-   * Use before exclusive port operations like esptool flash.
+   * Kills the currently running process group and rejects all pending queue
+   * items. Use before exclusive port operations like esptool flash.
+   *
+   * Resolves only once the killed process has actually exited (or after a
+   * short failsafe timeout) rather than just firing the kill signal and
+   * returning immediately - the caller needs the port genuinely free before
+   * it tries to open it again with esptool, and killGroup() only guarantees
+   * the signal was sent, not that the OS/serial driver has released the
+   * port's exclusive lock yet.
    */
-  abort() {
-    if (this.currentProcess) {
-      killGroup(this.currentProcess);
-      this.currentProcess = null;
-    }
+  abort(): Promise<void> {
+    const proc = this.currentProcess;
+    this.currentProcess = null;
+
     const pending = this.queue.splice(0);
     pending.forEach(({ reject }) => reject(new Error('queue aborted')));
     this.running = false;
+
+    if (!proc) return Promise.resolve();
+
+    return new Promise<void>(resolve => {
+      let done = false;
+      const finish = () => { if (!done) { done = true; resolve(); } };
+      proc.on('exit', finish);
+      proc.on('close', finish);
+      killGroup(proc);
+      setTimeout(finish, 1000); // failsafe in case exit/close never fires
+    });
   }
 
   enqueue<T>(fn: () => Promise<T>): Promise<T> {

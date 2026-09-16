@@ -111,8 +111,10 @@ export class EspFlasherViewProvider implements vscode.WebviewViewProvider {
         await this.context.globalState.update('mp.lastPort', port);
       }
 
-      // Guard: most commands need a port
-      const needsPort = !['flashFirmware', 'getPorts', 'getCategories', 'getModulesForCategory', 'getAllModules', 'getFirmwareOptions', 'requestRefresh', 'noop', 'openWebsite', 'openGithub'].includes(message.command);
+      // Guard: most commands need a port. flashFromWeb is exempted here because
+      // its port requirement is conditional (UF2 boards flash via a mass-storage
+      // drive, not a port) and is checked in its own case below instead.
+      const needsPort = !['flashFirmware', 'flashFromWeb', 'getPorts', 'getAllModules', 'getFirmwareOptions', 'requestRefresh', 'noop', 'openWebsite', 'openGithub'].includes(message.command);
       if (needsPort && (!port || typeof port !== 'string' || port.trim() === '')) {
         this.outputChannel.appendLine(`[WARN] Ignoring ${message.command} - no port provided yet.`);
         return;
@@ -120,7 +122,22 @@ export class EspFlasherViewProvider implements vscode.WebviewViewProvider {
 
       const ctx = this.getHandlerContext();
 
-      switch (message.command) {
+      try {
+        await this.dispatch(ctx, message);
+      } catch (err: any) {
+        // A handler threw outside its own try/catch - without this, that's
+        // a silent unhandled rejection in the extension host: no error
+        // shown, no log, the webview just looks like nothing happened.
+        this.outputChannel.appendLine(`[ERROR] Unhandled error while processing "${message.command}": ${err?.message || err}`);
+        vscode.window.showErrorMessage(`${message.command} failed: ${err?.message || err}`);
+      }
+    });
+  }
+
+  private async dispatch(ctx: HandlerContext, message: any): Promise<void> {
+    const { port } = message;
+
+    switch (message.command) {
 
         case 'flashFirmware':
           await handleFlashFirmware(ctx, message);
@@ -140,13 +157,17 @@ export class EspFlasherViewProvider implements vscode.WebviewViewProvider {
           break;
         }
 
-        case 'flashFromWeb':
-          if (!message.firmwareUrl || !message.port) {
+        case 'flashFromWeb': {
+          // UF2 boards enumerate as a mass-storage drive, not a serial port,
+          // so a port is only required for the esptool (.bin) flashing path.
+          const isUf2 = message.firmwareUrl?.endsWith('.uf2');
+          if (!message.firmwareUrl || (!isUf2 && !message.port)) {
             vscode.window.showErrorMessage('Firmware URL and port are required for flashing.');
             return;
           }
           await handleFlashFromWeb(ctx, message.firmwareUrl, message.port);
           break;
+        }
 
         case 'openFileFromDevice':
           await handleOpenFileFromDevice(ctx, message);
@@ -258,7 +279,6 @@ export class EspFlasherViewProvider implements vscode.WebviewViewProvider {
         default:
           this.outputChannel.appendLine(`[INFO] Unknown command from webview: ${message.command}`);
       }
-    });
   }
 
   /**

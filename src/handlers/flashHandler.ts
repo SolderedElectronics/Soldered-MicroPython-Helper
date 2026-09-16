@@ -193,16 +193,29 @@ function streamFlashWithProgress(esptoolPath: string, args: string[], ctx: Handl
  * Handles firmware flashing triggered from the webview (web download).
  * Supports UF2 (RP boards) and .bin (ESP32) formats.
  */
-export async function handleFlashFromWeb(ctx: HandlerContext, firmwareUrl: string, port: string): Promise<void> {
+export async function handleFlashFromWeb(ctx: HandlerContext, firmwareUrl: string, port?: string): Promise<void> {
   await closeAllSerial(ctx);
-  mpremoteQueue.abort();
-  await new Promise(r => setTimeout(r, 500)); // let OS release the port
+  await mpremoteQueue.abort();
+  await new Promise(r => setTimeout(r, 500)); // extra settle time for the OS/driver to release the port
 
   const firmwareName = path.basename(firmwareUrl);
   const tmpPath = path.join(os.tmpdir(), firmwareName);
   const isUF2 = firmwareUrl.endsWith('.uf2');
 
-  await downloadFile(firmwareUrl, tmpPath);
+  // Flip the button into its "working" state immediately, and make sure any
+  // failure below - including the download itself - always reaches the user
+  // instead of dying as a silent unhandled rejection in the extension host.
+  ctx.postMessage({ command: 'flashStatusUpdate', text: 'start' });
+
+  try {
+    ctx.outputChannel.appendLine(`Downloading firmware from: ${firmwareUrl}`);
+    await downloadFile(firmwareUrl, tmpPath);
+  } catch (err: any) {
+    vscode.window.showErrorMessage(`Failed to download firmware: ${err.message}`);
+    ctx.outputChannel.appendLine(`[ERROR] Failed to download firmware: ${err.message}`);
+    ctx.postMessage({ command: 'flashStatusUpdate', text: 'error' });
+    return;
+  }
 
   if (isUF2) {
     const selectedFolder = await vscode.window.showOpenDialog({
@@ -222,14 +235,35 @@ export async function handleFlashFromWeb(ctx: HandlerContext, firmwareUrl: strin
     await vscode.window.withProgress(
       { location: vscode.ProgressLocation.Notification, title: 'Flashing firmware...', cancellable: false },
       () => new Promise<void>((resolve, reject) => {
-        ctx.postMessage({ command: 'flashStatusUpdate', text: 'start' });
         ctx.outputChannel.appendLine(`Copying UF2 to: ${dest}`);
+        ctx.postMessage({ command: 'flashProgress', percent: 0, label: 'Copying to drive...' });
 
         try {
           fs.copyFileSync(tmpPath, dest);
-          vscode.window.showInformationMessage('UF2 firmware copied successfully!');
+
+          // copyFileSync only guarantees the bytes reached the OS's page
+          // cache, not the physical drive - on a removable UF2 volume that
+          // gap is exactly what the bootloader watches to know the write is
+          // finished. fsync-ing the file (and its containing directory, so
+          // the directory entry/size update lands too) forces the flush
+          // before we tell the user it's safe to unplug the board; skipping
+          // this risks a truncated firmware write that never boots and never
+          // shows up as a serial port again.
+          const fileFd = fs.openSync(dest, 'r+');
+          try { fs.fsyncSync(fileFd); } finally { fs.closeSync(fileFd); }
+          try {
+            const dirFd = fs.openSync(path.dirname(dest), 'r');
+            try { fs.fsyncSync(dirFd); } finally { fs.closeSync(dirFd); }
+          } catch {
+            // Directory fsync isn't supported on every platform/filesystem
+            // (e.g. some FAT drivers) - the file-level fsync above is the
+            // part that actually matters, so ignore failures here.
+          }
+
+          ctx.postMessage({ command: 'flashProgress', percent: 100, label: 'Done' });
+          vscode.window.showInformationMessage('UF2 firmware copied successfully! Wait for the drive to disappear/reboot on its own before unplugging.');
           ctx.postMessage({ command: 'flashStatusUpdate', text: 'done' });
-          ctx.outputChannel.appendLine(`UF2 copied to: ${dest} - unplug and replug your board now`);
+          ctx.outputChannel.appendLine(`UF2 copied to: ${dest} - the board should auto-eject and reboot into the new firmware; wait for that before unplugging.`);
           resolve();
         } catch (err: any) {
           vscode.window.showErrorMessage(`Failed to copy UF2 file: ${err.message}`);
@@ -243,16 +277,15 @@ export async function handleFlashFromWeb(ctx: HandlerContext, firmwareUrl: strin
   } else {
     const esptoolPath = vscode.workspace.getConfiguration('mp').get<string>('esptoolPath', 'esptool');
     const flashAddr = getFlashAddress(firmwareName);
-    const command = `${esptoolPath} --port ${port} --baud 115200 write-flash --flash-mode keep --flash-size keep --erase-all ${flashAddr} "${tmpPath}"`;
+    const args = ['--port', port!, '--baud', '115200', 'write-flash', '--flash-mode', 'keep', '--flash-size', 'keep', '--erase-all', flashAddr, tmpPath];
 
-    ctx.postMessage({ command: 'flashStatusUpdate', text: 'start' });
     ctx.postMessage({ command: 'flashProgress', percent: 0, label: 'Starting...' });
 
     await vscode.window.withProgress(
       { location: vscode.ProgressLocation.Notification, title: 'Flashing firmware...', cancellable: false },
       async () => {
         try {
-          await streamFlashWithProgress(command, ctx);
+          await streamFlashWithProgress(esptoolPath, args, ctx);
           vscode.window.showInformationMessage('Flash successful!');
           ctx.postMessage({ command: 'flashStatusUpdate', text: 'done' });
           // wait for board to finish booting before listing files
@@ -272,8 +305,8 @@ export async function handleFlashFromWeb(ctx: HandlerContext, firmwareUrl: strin
  */
 export async function handleFlashFirmware(ctx: HandlerContext, message: any): Promise<void> {
   await closeAllSerial(ctx);
-  mpremoteQueue.abort();
-  await new Promise(r => setTimeout(r, 500)); // let OS release the port
+  await mpremoteQueue.abort();
+  await new Promise(r => setTimeout(r, 500)); // extra settle time for the OS/driver to release the port
 
   const fileUri = await vscode.window.showOpenDialog({
     filters: { 'BIN files': ['bin'] },
@@ -287,7 +320,7 @@ export async function handleFlashFirmware(ctx: HandlerContext, message: any): Pr
   const firmwarePath = fileUri[0].fsPath;
   const esptoolPath = vscode.workspace.getConfiguration('mp').get<string>('esptoolPath', 'esptool');
   const flashAddr = getFlashAddress(path.basename(firmwarePath));
-  const cmd = `${esptoolPath} --port ${message.port} --baud 115200 write-flash --flash-mode keep --flash-size keep --erase-all ${flashAddr} "${firmwarePath}"`;
+  const args = ['--port', message.port, '--baud', '115200', 'write-flash', '--flash-mode', 'keep', '--flash-size', 'keep', '--erase-all', flashAddr, firmwarePath];
 
   ctx.postMessage({ command: 'flashStatusUpdate', text: 'start' });
   ctx.postMessage({ command: 'flashProgress', percent: 0, label: 'Starting...' });
@@ -296,7 +329,7 @@ export async function handleFlashFirmware(ctx: HandlerContext, message: any): Pr
     { location: vscode.ProgressLocation.Notification, title: 'Flashing firmware...', cancellable: false },
     async () => {
       try {
-        await streamFlashWithProgress(cmd, ctx);
+        await streamFlashWithProgress(esptoolPath, args, ctx);
         vscode.window.showInformationMessage('Firmware flashed successfully!');
         ctx.postMessage({ command: 'flashStatusUpdate', text: 'done' });
         await new Promise(r => setTimeout(r, 3000));
