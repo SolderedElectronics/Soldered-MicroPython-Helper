@@ -210,7 +210,7 @@ export class EspFlasherViewProvider implements vscode.WebviewViewProvider {
 
         case 'checkMicroPython':
           await closeAllSerial(ctx);
-          execMpremote(`mpremote connect ${port} exec "import sys; print(sys.implementation.name)"`)
+          execMpremote(`mpremote connect "${port}" exec "import sys; print(sys.implementation.name)"`)
             .then(stdout => {
               const installed = stdout.trim().toLowerCase().includes('micropython');
               this._view?.webview.postMessage({ command: 'micropythonStatus', installed });

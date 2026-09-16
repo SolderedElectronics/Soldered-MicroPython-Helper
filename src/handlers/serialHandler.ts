@@ -84,7 +84,7 @@ export function stopSerialMonitorAndReset(ctx: HandlerContext, portPath: string)
     ctx.setSerialMonitor(null);
   }
 
-  execMpremote(`mpremote connect ${portPath} soft-reset`)
+  execMpremote(`mpremote connect "${portPath}" soft-reset`)
     .then(() => ctx.outputChannel.appendLine('Device reset successfully.'))
     .catch(err => ctx.outputChannel.appendLine(`[ERROR] Error resetting device: ${err.message}`));
 }
@@ -104,7 +104,7 @@ export async function handleRunPythonFile(ctx: HandlerContext, message: any): Pr
   }
 
   const tempPath = path.join(os.tmpdir(), `__run_tmp__-${path.basename(filename)}`);
-  const downloadCmd = `mpremote connect ${port} fs cp :${filename} "${tempPath}"`;
+  const downloadCmd = `mpremote connect "${port}" fs cp :"${filename}" "${tempPath}"`;
 
   await vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: `Preparing ${filename}...`, cancellable: false },
@@ -302,11 +302,11 @@ export async function handleStopRunningCode(ctx: HandlerContext, message: any): 
 
     // Fallback: mpremote soft-reset with timeout
     try {
-      await execWithTimeout(`mpremote connect ${port} soft-reset`, 1500);
+      await execWithTimeout(`mpremote connect "${port}" soft-reset`, 1500);
       ctx.outputChannel.appendLine('Soft reset via mpremote.');
     } catch {
       try {
-        await execWithTimeout(`mpremote connect ${port} exec "import machine; machine.reset()"`, 2500);
+        await execWithTimeout(`mpremote connect "${port}" exec "import machine; machine.reset()"`, 2500);
         ctx.outputChannel.appendLine('Hard reset via machine.reset().');
       } catch (err2: any) {
         ctx.outputChannel.appendLine(`[ERROR] Reset fallback failed: ${err2?.message || String(err2)}`);

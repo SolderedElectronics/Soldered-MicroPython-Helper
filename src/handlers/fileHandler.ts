@@ -38,7 +38,7 @@ print(json.dumps(tree('/')))
   try {
     await fs.promises.writeFile(tempPath, script, 'utf8');
     const stdout = await withRetry(
-      () => execMpremote(`mpremote connect ${port} run "${tempPath}"`),
+      () => execMpremote(`mpremote connect "${port}" run "${tempPath}"`),
       5, 500, 'listFiles', ctx.outputChannel
     );
     const match = stdout.match(/\[[\s\S]*\]/);
@@ -85,7 +85,7 @@ rm(ubinascii.a2b_base64('${b64name}').decode())
 
   try {
     await fs.promises.writeFile(tempPath, script, 'utf8');
-    await execMpremote(`mpremote connect ${port} run "${tempPath}"`);
+    await execMpremote(`mpremote connect "${port}" run "${tempPath}"`);
     vscode.window.showInformationMessage(`Deleted ${filename} successfully.`);
     ctx.postMessage({ command: 'triggerListFiles', port });
   } catch (err: any) {
@@ -123,7 +123,7 @@ print('done')
   try {
     await fs.promises.writeFile(tempPath, script, 'utf8');
     ctx.outputChannel.appendLine('Deleting all files from device...');
-    await execMpremote(`mpremote connect ${port} run "${tempPath}"`);
+    await execMpremote(`mpremote connect "${port}" run "${tempPath}"`);
     vscode.window.showInformationMessage('All files deleted (boot.py and main.py kept).');
     ctx.postMessage({ command: 'triggerListFiles', port });
   } catch (err: any) {

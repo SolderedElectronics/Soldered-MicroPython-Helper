@@ -11,7 +11,7 @@ export async function uploadFileToDevice(
   port: string,
   outputChannel: OutputChannel
 ): Promise<void> {
-  const cmd = `mpremote connect ${port} fs cp "${localPath}" :"${devicePath}"`;
+  const cmd = `mpremote connect "${port}" fs cp "${localPath}" :"${devicePath}"`;
   outputChannel.appendLine(`Uploading ${localPath} → device:${devicePath}`);
   await withRetry(
     () => execCommand(cmd, outputChannel),

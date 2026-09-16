@@ -151,7 +151,7 @@ export async function handleUploadPythonFromPc(ctx: HandlerContext, message: any
         for (const dir of mkdirPaths) {
           const b64 = Buffer.from(dir).toString('base64');
           await execCommand(
-            `mpremote connect ${port} exec "import os,ubinascii; os.mkdir(ubinascii.a2b_base64('${b64}').decode())"`,
+            `mpremote connect "${port}" exec "import os,ubinascii; os.mkdir(ubinascii.a2b_base64('${b64}').decode())"`,
             ctx.outputChannel
           ).catch(() => {});
         }
@@ -181,7 +181,7 @@ export async function handleOpenFileFromDevice(ctx: HandlerContext, message: any
 
   try {
     await fs.promises.mkdir(tempDir, { recursive: true });
-    const cmd = `mpremote connect ${port} fs cp :"${filename}" "${localPath}"`;
+    const cmd = `mpremote connect "${port}" fs cp :"${filename}" "${localPath}"`;
     ctx.outputChannel.appendLine(`Downloading ${filename} from device...`);
 
     await withRetry(() => execMpremote(cmd), 5, 500, 'openFile', ctx.outputChannel);
