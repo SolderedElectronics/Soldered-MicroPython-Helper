@@ -1,0 +1,96 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies and compile
+        run: |
+          npm ci
+          npm run compile
+
+      - name: Upload compiled dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      # The very first version of a not-yet-existing extension has to be
+      # created by exactly one request; racing it in parallel across targets
+      # gets some jobs "already exists" errors, and canceling siblings on a
+      # failure (fail-fast) can kill an in-flight upload mid-transfer and
+      # leave a broken asset for that target. Run one target at a time and
+      # let every target attempt regardless of another's outcome.
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        include:
+          - target: win32-x64
+            os: win32
+            cpu: x64
+          - target: win32-arm64
+            os: win32
+            cpu: arm64
+          - target: linux-x64
+            os: linux
+            cpu: x64
+            libc: glibc
+          - target: linux-arm64
+            os: linux
+            cpu: arm64
+            libc: glibc
+          - target: linux-armhf
+            os: linux
+            cpu: arm
+            libc: glibc
+          - target: alpine-x64
+            os: linux
+            cpu: x64
+            libc: musl
+          - target: alpine-arm64
+            os: linux
+            cpu: arm64
+            libc: musl
+          - target: darwin-x64
+            os: darwin
+            cpu: x64
+          - target: darwin-arm64
+            os: darwin
+            cpu: arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Download compiled dist
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Install ${{ matrix.target }} native dependencies
+        run: >
+          npm ci --omit=dev
+          --os=${{ matrix.os }}
+          --cpu=${{ matrix.cpu }}
+          ${{ matrix.libc && format('--libc={0}', matrix.libc) || '' }}
+
+      - name: Publish ${{ matrix.target }}
+        run: npx @vscode/vsce publish --target ${{ matrix.target }} -p ${{ secrets.VSCE_PAT }}

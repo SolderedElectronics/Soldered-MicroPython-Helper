@@ -10,3 +10,4 @@ tsconfig.json
 !dist/**
 package-lock.json
 *.vsix
+.vscode/**
