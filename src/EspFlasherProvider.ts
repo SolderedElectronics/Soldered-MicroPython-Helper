@@ -9,7 +9,7 @@ import { startSerialMonitor, handleRunPythonFile, handleStopRunningCode, closeAl
 import { handleFlashFromWeb, handleFlashFirmware, fetchFirmwareList } from './handlers/flashHandler';
 import { handleListFiles, handleDeleteFile, handleDeleteAllFiles } from './handlers/fileHandler';
 import { handleUploadPythonAsIs, handleUploadPythonFromPc, handleOpenFileFromDevice } from './handlers/uploadHandler';
-import { handleFetchModule, handleGetCategories, handleGetModulesForCategory, handleGetAllModules } from './handlers/moduleHandler';
+import { handleFetchModule, handleGetPackages } from './handlers/moduleHandler';
 import { execMpremote } from './utils/execUtils';
 
 const IGNORED_PORT_PATTERNS = ['debug-console', 'Bluetooth-Incoming-Port'];
@@ -209,16 +209,8 @@ export class EspFlasherViewProvider implements vscode.WebviewViewProvider {
           await handleFetchModule(ctx, message);
           break;
 
-        case 'getCategories':
-          await handleGetCategories(ctx);
-          break;
-
-        case 'getModulesForCategory':
-          await handleGetModulesForCategory(ctx, message);
-          break;
-
         case 'getAllModules':
-          await handleGetAllModules(ctx, message);
+          await handleGetPackages(ctx, message);
           break;
 
         case 'deleteFile':

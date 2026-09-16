@@ -7,11 +7,10 @@ import { execCommand } from '../utils/execUtils';
 import { downloadFile } from './flashHandler';
 import { closeAllSerial } from './serialHandler';
 
-const REPO_ROOT = 'https://api.github.com/repos/SolderedElectronics/Soldered-MicroPython-Modules/contents';
-const FALLBACK_CATEGORIES = ['Sensors', 'Displays', 'Actuators'];
-const IGNORE_FOLDERS = ['.github', 'moduletemplate', 'img'];
-const CACHE_KEY = 'mp.modulesCache';
+const PACKAGES_API_URL = 'https://5jzpvxny0g.execute-api.ap-southeast-2.amazonaws.com/packages';
+const CACHE_KEY = 'mp.packagesCache';
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const ALLOWED_STATUSES = ['HUMAN_REVIEWED', 'VALID'];
 
 // GitHub token cache — undefined = not yet checked, null = not available
 let cachedGithubToken: string | null | undefined = undefined;
@@ -35,190 +34,253 @@ async function githubHeaders(): Promise<Record<string, string>> {
   return headers;
 }
 
-interface ModulesCache {
-  timestamp: number;
-  categories: string[];
-  modules: { [category: string]: string[] };
+interface RawPackage {
+  id: string;
+  name: string;
+  prettyName?: string;
+  author: string;
+  description: string;
+  url: string;
+  tags: string[];
+  version: string;
+  license: string;
+  status: string;
+  defaultBranch?: string;
+  createdAt: string;
+  updatedAt: string;
+  submitter: string;
 }
 
-function getCachedModules(ctx: HandlerContext): ModulesCache | null {
-  const cached = ctx.extensionContext.globalState.get<ModulesCache>(CACHE_KEY);
+export interface PackageInfo extends RawPackage {
+  host: 'github' | 'other';
+}
+
+interface PackagesCache {
+  timestamp: number;
+  packages: PackageInfo[];
+}
+
+interface ResolvedFile {
+  name: string;
+  download_url: string;
+}
+
+interface ResolvedFiles {
+  libraryFiles: ResolvedFile[];
+  exampleFiles: ResolvedFile[];
+}
+
+interface ParsedGithubUrl {
+  owner: string;
+  repo: string;
+  ref?: string;
+  subPath: string;
+}
+
+/**
+ * GETs a URL and parses the response body as JSON. Rejects on network
+ * errors, non-2xx status codes, or unparseable bodies.
+ */
+function fetchJson(url: string, headers: Record<string, string> = {}): Promise<any> {
+  return new Promise((resolve, reject) => {
+    https.get(url, { headers }, res => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        if (res.statusCode && res.statusCode >= 400) {
+          reject(new Error(`HTTP ${res.statusCode} for ${url}`));
+          return;
+        }
+        try { resolve(JSON.parse(data)); }
+        catch (e) { reject(e); }
+      });
+    }).on('error', reject);
+  });
+}
+
+function getCachedPackages(ctx: HandlerContext): PackagesCache | null {
+  const cached = ctx.extensionContext.globalState.get<PackagesCache>(CACHE_KEY);
   if (cached && (Date.now() - cached.timestamp) < CACHE_TTL_MS) {
     return cached;
   }
   return null;
 }
 
-async function setCachedModules(ctx: HandlerContext, categories: string[], modules: { [category: string]: string[] }): Promise<ModulesCache> {
-  const cache: ModulesCache = { timestamp: Date.now(), categories, modules };
+async function setCachedPackages(ctx: HandlerContext, packages: PackageInfo[]): Promise<PackagesCache> {
+  const cache: PackagesCache = { timestamp: Date.now(), packages };
   await ctx.extensionContext.globalState.update(CACHE_KEY, cache);
   return cache;
 }
 
 /**
- * Fetches all top-level directory names from the repo root.
- * Falls back to hardcoded list if the request fails.
+ * Fetches the full checkmim.com package list, keeping only reviewed/valid
+ * entries and tagging each with whether it's GitHub-hosted (the only host
+ * we can currently auto-install from).
  */
-async function fetchCategories(): Promise<string[]> {
-  const headers = await githubHeaders();
-  return new Promise((resolve) => {
-    https.get(REPO_ROOT, { headers }, res => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        try {
-          const items = JSON.parse(data);
-          const folders = items
-            .filter((f: any) => f.type === 'dir' && !IGNORE_FOLDERS.includes(f.name.toLowerCase()))
-            .map((f: any) => f.name);
-          resolve(folders.length ? folders : FALLBACK_CATEGORIES);
-        } catch {
-          resolve(FALLBACK_CATEGORIES);
-        }
-      });
-    }).on('error', () => resolve(FALLBACK_CATEGORIES));
-  });
+async function fetchPackages(): Promise<PackageInfo[]> {
+  const raw: RawPackage[] = await fetchJson(PACKAGES_API_URL);
+  return raw
+    .filter(p => ALLOWED_STATUSES.includes(p.status))
+    .map(p => ({
+      ...p,
+      host: /^https:\/\/github\.com\//i.test(p.url || '') ? 'github' as const : 'other' as const,
+    }));
 }
 
 /**
- * Returns all top-level category folders from the repo to the webview.
- * Uses cache if available.
+ * Returns the cached (or freshly fetched) package list to the webview.
+ * Pass force: true to bypass the cache.
  */
-export async function handleGetCategories(ctx: HandlerContext): Promise<void> {
-  const cached = getCachedModules(ctx);
-  if (cached) {
-    ctx.postMessage({ command: 'setCategories', categories: cached.categories });
-    return;
-  }
-  const categories = await fetchCategories();
-  ctx.postMessage({ command: 'setCategories', categories });
-}
-
-/**
- * Fetches all modules across all categories in parallel.
- * Returns a map of { [category]: string[] } to the webview.
- * Uses globalState cache with 24hr TTL. Pass force: true to bypass cache.
- */
-export async function handleGetAllModules(ctx: HandlerContext, message: any = {}): Promise<void> {
+export async function handleGetPackages(ctx: HandlerContext, message: any = {}): Promise<void> {
   const { force } = message;
 
   if (!force) {
-    const cached = getCachedModules(ctx);
+    const cached = getCachedPackages(ctx);
     if (cached) {
-      ctx.postMessage({ command: 'setCategories', categories: cached.categories });
-      ctx.postMessage({ command: 'setAllModules', modules: cached.modules, cachedAt: cached.timestamp });
+      ctx.postMessage({ command: 'setPackages', packages: cached.packages, cachedAt: cached.timestamp });
       return;
     }
   }
 
-  ctx.postMessage({ command: 'setAllModulesLoading' });
+  ctx.postMessage({ command: 'setPackagesLoading' });
 
-  const categories = await fetchCategories();
-  const headers = await githubHeaders();
-
-  const results = await Promise.all(
-    categories.map(category =>
-      new Promise<{ category: string; modules: string[] }>(resolve => {
-        const apiUrl = `${REPO_ROOT}/${category}`;
-        https.get(apiUrl, { headers }, res => {
-          let data = '';
-          res.on('data', chunk => data += chunk);
-          res.on('end', () => {
-            try {
-              const items = JSON.parse(data);
-              let modules = items.filter((f: any) => f.type === 'dir').map((f: any) => f.name);
-              // flat-structure category (e.g. Qwiic): no subdirs, .py files directly inside
-              if (modules.length === 0) {
-                modules = items
-                  .filter((f: any) => f.type === 'file' && f.name.endsWith('.py'))
-                  .map((f: any) => f.name.replace(/\.py$/, ''));
-              }
-              resolve({ category, modules });
-            } catch {
-              resolve({ category, modules: [] });
-            }
-          });
-        }).on('error', () => resolve({ category, modules: [] }));
-      })
-    )
-  );
-
-  const moduleMap: { [category: string]: string[] } = {};
-  results.forEach(({ category, modules }) => {
-    if (modules.length > 0) moduleMap[category] = modules;
-  });
-
-  const cache = await setCachedModules(ctx, categories, moduleMap);
-  ctx.postMessage({ command: 'setCategories', categories });
-  ctx.postMessage({ command: 'setAllModules', modules: moduleMap, cachedAt: cache.timestamp });
+  try {
+    const packages = await fetchPackages();
+    const cache = await setCachedPackages(ctx, packages);
+    ctx.postMessage({ command: 'setPackages', packages, cachedAt: cache.timestamp });
+  } catch (err: any) {
+    ctx.outputChannel.appendLine(`[ERROR] Failed to fetch package list: ${err.message}`);
+    ctx.postMessage({ command: 'setPackages', packages: [], cachedAt: 0 });
+  }
 }
 
 /**
- * Returns all module folders inside a given category.
- * Uses cache if available, otherwise fetches from GitHub.
+ * Parses a checkmim package's `url` into the GitHub location it should be
+ * installed from. Handles repo-root URLs (most third-party packages) and
+ * tree-style URLs with an explicit branch/subfolder (e.g. micropython-lib's
+ * stdlib packages, which live as subfolders of one monorepo). Returns null
+ * for anything not hosted on github.com.
  */
-export async function handleGetModulesForCategory(ctx: HandlerContext, message: any): Promise<void> {
-  const { category } = message;
-  if (!category) {
-    ctx.postMessage({ command: 'setModulesForCategory', modules: [] });
-    return;
-  }
+function parseGithubUrl(pkg: PackageInfo): ParsedGithubUrl | null {
+  if (!pkg.url) return null;
 
-  // Use cache if available
-  const cached = getCachedModules(ctx);
-  if (cached && cached.modules[category]) {
-    ctx.postMessage({ command: 'setModulesForCategory', modules: cached.modules[category] });
-    return;
-  }
+  let m = pkg.url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/tree\/([^/]+)\/(.+?)\/?$/i);
+  if (m) return { owner: m[1], repo: m[2], ref: m[3], subPath: m[4] };
 
-  const apiUrl = `${REPO_ROOT}/${category}`;
-  const headers = await githubHeaders();
-  return new Promise((resolve) => {
-    https.get(apiUrl, { headers }, res => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        try {
-          const items = JSON.parse(data);
-          let modules = items.filter((f: any) => f.type === 'dir').map((f: any) => f.name);
-          if (modules.length === 0) {
-            modules = items
-              .filter((f: any) => f.type === 'file' && f.name.endsWith('.py'))
-              .map((f: any) => f.name.replace(/\.py$/, ''));
-          }
-          ctx.postMessage({ command: 'setModulesForCategory', modules });
-        } catch {
-          ctx.outputChannel.appendLine(`[WARN] Failed to fetch modules for ${category}`);
-          ctx.postMessage({ command: 'setModulesForCategory', modules: [] });
-        }
-        resolve();
-      });
-    }).on('error', err => {
-      ctx.outputChannel.appendLine(`[WARN] GitHub API error for ${category}: ${err.message}`);
-      ctx.postMessage({ command: 'setModulesForCategory', modules: [] });
-      resolve();
-    });
-  });
+  m = pkg.url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/i);
+  if (m) return { owner: m[1], repo: m[2], ref: pkg.defaultBranch, subPath: '' };
+
+  return null;
 }
 
 /**
- * Fetches all .py files from a GitHub API URL and uploads them to the device.
+ * Builds a GitHub Contents API URL. Omitting `ref` is intentional (not just
+ * a fallback) - the Contents API resolves it to the repo's default branch on
+ * its own, so repo-root packages that don't carry a defaultBranch need no
+ * extra API round-trip to discover it.
  */
-async function uploadDirectoryFiles(url: string, port: string, ctx: HandlerContext): Promise<void> {
-  const headers = await githubHeaders();
-  const files: any[] = await new Promise((resolve, reject) => {
-    const req = https.get(url, { headers }, res => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        try { resolve(JSON.parse(data)); }
-        catch (e) { reject(e); }
-      });
-    }).on('error', reject);
-    req.setTimeout(10000, () => req.destroy(new Error('Request timed out')));
-  });
+function contentsApiUrl(owner: string, repo: string, subPath: string, ref?: string): string {
+  const base = `https://api.github.com/repos/${owner}/${repo}/contents/${subPath}`;
+  return ref ? `${base}?ref=${encodeURIComponent(ref)}` : base;
+}
 
-  const pyFiles = files.filter((f: any) => f.name.endsWith('.py'));
+/**
+ * Ref to use when building raw.githubusercontent.com URLs directly (used
+ * for the package.json-manifest path, which doesn't go through the Contents
+ * API and so doesn't get its "omit ref = default branch" behavior for free).
+ * 'HEAD' is a raw.githubusercontent.com alias for the default branch.
+ */
+function resolveRawRef(parsed: ParsedGithubUrl): string {
+  return parsed.ref || 'HEAD';
+}
+
+function buildRawUrl(owner: string, repo: string, ref: string, targetPath: string): string {
+  const encodedPath = targetPath.split('/').map(encodeURIComponent).join('/');
+  return `https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${encodedPath}`;
+}
+
+/**
+ * Tries to fetch a package's mip manifest (package.json) - the authoritative
+ * file list when present. Returns null if there's no manifest at this
+ * location (caller falls back to a plain folder scan), not on any other
+ * kind of failure.
+ */
+async function fetchManifestFiles(
+  owner: string, repo: string, subPath: string, ref: string, ctx: HandlerContext
+): Promise<ResolvedFiles | null> {
+  const manifestPath = subPath ? `${subPath}/package.json` : 'package.json';
+  const manifestUrl = buildRawUrl(owner, repo, ref, manifestPath);
+
+  let manifest: any;
+  try {
+    manifest = await fetchJson(manifestUrl);
+  } catch {
+    return null;
+  }
+  if (!manifest || !Array.isArray(manifest.urls)) return null;
+
+  if (Array.isArray(manifest.deps) && manifest.deps.length > 0) {
+    ctx.outputChannel.appendLine(
+      `[WARN] Package at ${owner}/${repo} declares dependencies (${manifest.deps.join(', ')}) - ` +
+      `dependency resolution isn't supported yet, only this package's own files will be installed.`
+    );
+  }
+
+  const libraryFiles: ResolvedFile[] = [];
+  const exampleFiles: ResolvedFile[] = [];
+
+  for (const entry of manifest.urls) {
+    const targetPath: string | undefined = Array.isArray(entry) ? entry[0] : undefined;
+    if (!targetPath) continue;
+    const fullPath = subPath ? `${subPath}/${targetPath}` : targetPath;
+    const file: ResolvedFile = {
+      name: targetPath.split('/').pop() || targetPath,
+      download_url: buildRawUrl(owner, repo, ref, fullPath),
+    };
+    if (/^examples\//i.test(targetPath)) exampleFiles.push(file);
+    else libraryFiles.push(file);
+  }
+
+  return { libraryFiles, exampleFiles };
+}
+
+/**
+ * Fallback for packages with no mip manifest (e.g. micropython-lib's
+ * stdlib/extmod packages, which use a build-time manifest.py instead): grabs
+ * .py files directly in the folder, plus an "examples" subfolder if present.
+ */
+async function fetchFolderScanFiles(
+  owner: string, repo: string, subPath: string, ref: string | undefined, headers: Record<string, string>
+): Promise<ResolvedFiles> {
+  const items = await fetchJson(contentsApiUrl(owner, repo, subPath, ref), headers);
+  const list = Array.isArray(items) ? items : [];
+
+  const libraryFiles: ResolvedFile[] = list
+    .filter((f: any) => f.type === 'file' && f.name.endsWith('.py') && !['manifest.py', 'setup.py'].includes(f.name.toLowerCase()))
+    .map((f: any) => ({ name: f.name, download_url: f.download_url }));
+
+  const examplesDir = list.find((f: any) => f.type === 'dir' && f.name.toLowerCase() === 'examples');
+  let exampleFiles: ResolvedFile[] = [];
+  if (examplesDir) {
+    try {
+      const exampleSubPath = subPath ? `${subPath}/${examplesDir.name}` : examplesDir.name;
+      const exampleItems = await fetchJson(contentsApiUrl(owner, repo, exampleSubPath, ref), headers);
+      exampleFiles = (Array.isArray(exampleItems) ? exampleItems : [])
+        .filter((f: any) => f.type === 'file' && f.name.endsWith('.py'))
+        .map((f: any) => ({ name: f.name, download_url: f.download_url }));
+    } catch {
+      // No examples reachable - not fatal, library files are still useful.
+    }
+  }
+
+  return { libraryFiles, exampleFiles };
+}
+
+/**
+ * Downloads and uploads all .py files in the given list to the device.
+ */
+async function uploadDirectoryFiles(files: ResolvedFile[], port: string, ctx: HandlerContext): Promise<void> {
+  const pyFiles = files.filter(f => f.name.endsWith('.py'));
   if (pyFiles.length === 0) {
     vscode.window.showWarningMessage(`No .py files found.`);
     return;
@@ -229,37 +291,25 @@ async function uploadDirectoryFiles(url: string, port: string, ctx: HandlerConte
     const tempPath = path.join(os.tmpdir(), uploadName);
     await downloadFile(file.download_url, tempPath);
     ctx.outputChannel.appendLine(`Uploading ${uploadName}`);
-    await execCommand(`mpremote connect ${port} fs cp "${tempPath}" :"${uploadName}"`, ctx.outputChannel);
+    await execCommand(`mpremote connect "${port}" fs cp "${tempPath}" :"${uploadName}"`, ctx.outputChannel);
   }
 }
 
 /**
- * Fetches example files, shows a multi-select QuickPick, uploads chosen files.
+ * Shows a multi-select QuickPick over the given example files, uploads
+ * chosen ones.
  */
-async function uploadExamplesWithPicker(url: string, port: string, sensor: string, ctx: HandlerContext): Promise<void> {
-  const headers = await githubHeaders();
-  const files: any[] = await new Promise((resolve, reject) => {
-    const req = https.get(url, { headers }, res => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        try { resolve(JSON.parse(data)); }
-        catch (e) { reject(e); }
-      });
-    }).on('error', reject);
-    req.setTimeout(10000, () => req.destroy(new Error('Request timed out')));
-  });
-
-  const pyFiles = files.filter((f: any) => f.name.endsWith('.py'));
+async function uploadExamplesWithPicker(files: ResolvedFile[], port: string, packageLabel: string, ctx: HandlerContext): Promise<void> {
+  const pyFiles = files.filter(f => f.name.endsWith('.py'));
   if (pyFiles.length === 0) {
-    vscode.window.showWarningMessage(`No example files found for "${sensor}".`);
+    vscode.window.showWarningMessage(`No example files found for "${packageLabel}".`);
     return;
   }
 
-  const items = pyFiles.map((f: any) => ({ label: f.name, picked: true, file: f }));
+  const items = pyFiles.map(f => ({ label: f.name, picked: true, file: f }));
   const selected = await vscode.window.showQuickPick(items, {
     canPickMany: true,
-    placeHolder: `Select examples to download for "${sensor}" (all pre-selected)`,
+    placeHolder: `Select examples to download for "${packageLabel}" (all pre-selected)`,
     title: 'Download Examples',
   });
 
@@ -270,102 +320,77 @@ async function uploadExamplesWithPicker(url: string, port: string, sensor: strin
     const tempPath = path.join(os.tmpdir(), uploadName);
     await downloadFile(item.file.download_url, tempPath);
     ctx.outputChannel.appendLine(`Uploading ${uploadName}`);
-    await execCommand(`mpremote connect ${port} fs cp "${tempPath}" :"${uploadName}"`, ctx.outputChannel);
+    await execCommand(`mpremote connect "${port}" fs cp "${tempPath}" :"${uploadName}"`, ctx.outputChannel);
   }
 }
 
 /**
- * Fetches a Soldered module (library/examples/both) from GitHub and uploads to device.
+ * Fetches a checkmim package (library/examples/both) and uploads it to the
+ * device.
  */
 export async function handleFetchModule(ctx: HandlerContext, message: any): Promise<void> {
-  const { sensor, port, mode } = message;
+  const { packageId, port, mode } = message;
 
   await closeAllSerial(ctx);
 
-  if (!sensor || !port) {
-    vscode.window.showErrorMessage('Module name and port are required.');
+  if (!packageId || !port) {
+    vscode.window.showErrorMessage('Package and port are required.');
     return;
   }
 
-  const cached = getCachedModules(ctx);
-  const categories = cached?.categories ?? await fetchCategories();
+  let packages = getCachedPackages(ctx)?.packages;
+  if (!packages) {
+    try {
+      packages = await fetchPackages();
+    } catch (err: any) {
+      vscode.window.showErrorMessage(`Failed to fetch package list: ${err.message}`);
+      return;
+    }
+  }
+
+  const pkg = packages.find(p => p.id === packageId);
+  if (!pkg) {
+    vscode.window.showErrorMessage(`Could not find package "${packageId}".`);
+    return;
+  }
+  const label = pkg.prettyName || pkg.name;
+
+  if (pkg.host !== 'github') {
+    vscode.window.showErrorMessage(`"${label}" is hosted outside GitHub and can't be auto-installed yet. Open it manually: ${pkg.url}`);
+    return;
+  }
+
+  const parsed = parseGithubUrl(pkg);
+  if (!parsed) {
+    vscode.window.showErrorMessage(`Could not determine where to fetch "${label}" from.`);
+    return;
+  }
+
+  const ref = resolveRawRef(parsed);
   const headers = await githubHeaders();
-  let baseUrl: string | undefined;
-  let flatDownloadUrl: string | undefined; // set only for flat-structure modules (e.g. Qwiic)
-  const searchCategories: string[] = [];
-  if (cached) {
-    for (const [cat, mods] of Object.entries(cached.modules)) {
-      if (mods.includes(sensor)) { searchCategories.unshift(cat); break; }
-    }
-  }
-  // append remaining categories as fallback
-  for (const cat of categories) {
-    if (!searchCategories.includes(cat)) searchCategories.push(cat);
-  }
 
-  for (const category of searchCategories) {
-    // Try standard deep path: category/module/module/
-    const deepUrl = `${REPO_ROOT}/${category}/${sensor}/${sensor}`;
-    const deepStatus: number | undefined = await new Promise((resolve) => {
-      https.get(deepUrl, { headers }, res => {
-        res.resume(); // consume and discard body to free the socket
-        resolve(res.statusCode);
-      }).on('error', () => resolve(undefined));
-    });
-    if (deepStatus === 200) {
-      baseUrl = deepUrl;
-      break;
+  let resolved: ResolvedFiles | null = await fetchManifestFiles(parsed.owner, parsed.repo, parsed.subPath, ref, ctx);
+  if (!resolved) {
+    try {
+      resolved = await fetchFolderScanFiles(parsed.owner, parsed.repo, parsed.subPath, parsed.ref, headers);
+    } catch (err: any) {
+      vscode.window.showErrorMessage(`Failed to fetch package "${label}": ${err.message}`);
+      return;
     }
-
-    // Try flat path: category/module.py (e.g. Qwiic/qwiic.py)
-    const categoryListData: string | undefined = await new Promise((resolve) => {
-      https.get(`${REPO_ROOT}/${category}`, { headers }, res => {
-        let data = '';
-        res.on('data', (chunk: string) => data += chunk);
-        res.on('end', () => resolve(data));
-      }).on('error', () => resolve(undefined));
-    });
-    if (categoryListData) {
-      try {
-        const items = JSON.parse(categoryListData);
-        const match = items.find((f: any) =>
-          f.type === 'file' && f.name.toLowerCase() === `${sensor.toLowerCase()}.py`
-        );
-        if (match) {
-          baseUrl = `${REPO_ROOT}/${category}`;
-          flatDownloadUrl = match.download_url;
-          break;
-        }
-      } catch {}
-    }
-  }
-
-  if (!baseUrl) {
-    vscode.window.showErrorMessage(`Could not find module "${sensor}" in any category.`);
-    return;
   }
 
   try {
     if (mode === 'library' || mode === 'all') {
-      if (flatDownloadUrl) {
-        // flat module: single .py file directly in category folder
-        const uploadName = `${sensor}.py`.replace(/-/g, '_');
-        const tempPath = path.join(os.tmpdir(), uploadName);
-        await downloadFile(flatDownloadUrl, tempPath);
-        ctx.outputChannel.appendLine(`Uploading ${uploadName}`);
-        await execCommand(`mpremote connect ${port} fs cp "${tempPath}" :"${uploadName}"`, ctx.outputChannel);
-      } else {
-        await uploadDirectoryFiles(baseUrl, port, ctx);
-      }
+      await uploadDirectoryFiles(resolved.libraryFiles, port, ctx);
     }
     if (mode === 'examples' || mode === 'all') {
-      if (!flatDownloadUrl) {
-        await uploadExamplesWithPicker(`${baseUrl}/Examples`, port, sensor, ctx);
+      if (resolved.exampleFiles.length > 0) {
+        await uploadExamplesWithPicker(resolved.exampleFiles, port, label, ctx);
       }
-      // flat modules have no examples — skip silently
+      // no examples for this package - skip silently, same as before
     }
 
-    vscode.window.showInformationMessage(`Downloaded ${mode} files for "${sensor}"`);
+    vscode.window.showInformationMessage(`Downloaded ${mode} files for "${label}"`);
     ctx.postMessage({ command: 'triggerListFiles', port });
     ctx.postMessage({ command: 'moduleFetchStatus', mode, status: 'done' });
   } catch (err: any) {

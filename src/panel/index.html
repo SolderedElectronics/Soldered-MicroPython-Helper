@@ -343,22 +343,26 @@
     color: var(--vscode-list-activeSelectionForeground);
   }
 
-  .or-divider {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin: 12px 0;
-    color: var(--vscode-descriptionForeground);
-    font-size: 0.85em;
+  .suggestion-item.disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
   }
 
-  .or-divider::before,
-  .or-divider::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: var(--vscode-editorGroup-border);
+  .suggestion-item.disabled:hover {
+    background: none;
+    color: var(--vscode-foreground);
   }
+
+  .suggestion-name {
+    font-weight: 600;
+  }
+
+  .suggestion-meta {
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground);
+    margin-top: 1px;
+  }
+
 
   .port-picker {
     display: inline-flex;
@@ -495,7 +499,7 @@
       <li><strong>Upload Python Scripts:</strong> Upload the currently open file or pick a file from your PC.</li>
       <li><strong>Manage Files:</strong> List, delete, run, or open files stored on the device. Double-click a file to open it in the editor.</li>
       <li><strong>Serial Monitor:</strong> View live output from the board over serial.</li>
-      <li><strong>Fetch Soldered Modules:</strong> Search and download libraries and examples for Soldered hardware modules.</li>
+      <li><strong>Fetch MicroPython Package:</strong> Search and download libraries and examples for any package listed on <a href="https://checkmim.com">checkmim.com</a>, not just Soldered's.</li>
     </ul>
 
     <p style="margin-top: 1rem; font-size: 0.9em; color: var(--vscode-descriptionForeground);">
@@ -632,33 +636,21 @@
   </div>
 </div>
 
-<!-- Fetch Soldered Module Section -->
+<!-- Fetch MicroPython Package Section -->
 <div class="section toggleable" id="solderedFetchSection">
   <h4 onclick="toggleSection('solderedFetchSection')">
-    <span class="arrow">▶</span> Fetch Soldered MicroPython Module
+    <span class="arrow">▶</span> Fetch MicroPython Package
   </h4>
   <div class="section-content">
-    <button id="refreshModulesBtn" title="Refresh module list from GitHub">↻ Refresh module list</button>
+    <button id="refreshModulesBtn" title="Refresh package list from checkmim.com">↻ Refresh package list</button>
     <div id="modulesCacheStatus" style="font-size: 0.82em; color: var(--vscode-descriptionForeground); margin-top: 4px; margin-bottom: 8px; display: none;"></div>
-    <div id="modulesLoadingStatus" style="font-size: 0.82em; color: var(--vscode-descriptionForeground); margin-top: 4px; margin-bottom: 8px; display: none;">Fetching from GitHub...</div>
+    <div id="modulesLoadingStatus" style="font-size: 0.82em; color: var(--vscode-descriptionForeground); margin-top: 4px; margin-bottom: 8px; display: none;">Fetching from checkmim.com...</div>
 
-    <label for="moduleSearchInput">Search module:</label>
+    <label for="moduleSearchInput">Search package:</label>
     <div class="module-search-wrap">
-      <input type="text" id="moduleSearchInput" placeholder="Loading modules..." disabled />
+      <input type="text" id="moduleSearchInput" placeholder="Loading packages..." disabled />
       <ul id="moduleSuggestions"></ul>
     </div>
-
-    <div class="or-divider">or browse by category</div>
-
-    <label for="categorySelect">Category:</label>
-    <select id="categorySelect">
-      <option value="" disabled selected>Loading categories...</option>
-    </select>
-
-    <label for="moduleSelect">Module:</label>
-    <select id="moduleSelect">
-      <option value="" disabled selected>Select a category first</option>
-    </select>
 
     <div class="buttons-row">
       <button id="fetchLibraryBtn">
@@ -913,16 +905,15 @@ window.addEventListener('load', () => {
   restoreToggleState();
   restoreState();
   vscode.postMessage({ command: 'getFirmwareOptions' });
-  vscode.postMessage({ command: 'getCategories' });
   vscode.postMessage({ command: 'getAllModules' });
   startPortScanning();
   // Deferred to the load event (not called synchronously mid-script) because
-  // this reads state variables (allModulesLoaded, ...) that are declared with
+  // this reads state variables (allPackagesLoaded, ...) that are declared with
   // let further down in this same script - calling it synchronously here
   // would hit them before their declaration runs (temporal dead zone),
   // throwing and aborting every listener registration after that point in
-  // the script (including the message handler that processes setCategories/
-  // setAllModules/populatePorts/etc. - this was silently broken before).
+  // the script (including the message handler that processes setPackages/
+  // populatePorts/etc. - this was silently broken before).
   updateButtonStates(document.getElementById('port').value);
 });
 
@@ -1220,9 +1211,9 @@ document.getElementById('deleteAllFilesBtn').addEventListener('click', () => {
   vscode.postMessage({ command: 'deleteAllFiles', port });
 });
 
-// Force-refresh module list from GitHub (bypasses cache)
+// Force-refresh package list from checkmim.com (bypasses cache)
 document.getElementById('refreshModulesBtn').addEventListener('click', () => {
-  allModulesLoaded = false;
+  allPackagesLoaded = false;
   updateButtonStates(document.getElementById('port').value);
   vscode.postMessage({ command: 'getAllModules', force: true });
 });
@@ -1369,9 +1360,14 @@ function updateButtonStates(port) {
   if (openBtn) openBtn.disabled = noPort || !selectedFilePath;
   const delBtn = document.getElementById('deleteFileBtn');
   if (delBtn) delBtn.disabled = noPort || !selectedFilePath;
-  // moduleSearchInput only enabled if port selected AND modules loaded
+  // moduleSearchInput only enabled if port selected AND packages loaded
   const searchInput = document.getElementById('moduleSearchInput');
-  if (searchInput) searchInput.disabled = noPort || !allModulesLoaded;
+  if (searchInput) searchInput.disabled = noPort || !allPackagesLoaded;
+  // Fetch buttons also need an actual package picked from the suggestions
+  ['fetchLibraryBtn', 'fetchExamplesBtn', 'fetchAllBtn'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) btn.disabled = btn.disabled || !selectedPackage;
+  });
 }
 
 // Save original titles so we can restore them
@@ -1400,26 +1396,22 @@ document.getElementById('port').addEventListener('change', e => {
 document.getElementById('firmwareSelect').addEventListener('change', e => {
   currentState.selectedFirmware = e.target.value;
   saveState();
+  updateFlashFromWebState(document.getElementById('port').value);
 });
 
-// === Soldered Module Fetching ===
+// === Package Fetching (checkmim.com) ===
 
-const categorySelect = document.getElementById('categorySelect');
-const moduleSelect = document.getElementById('moduleSelect');
 const moduleSearchInput = document.getElementById('moduleSearchInput');
 const moduleSuggestions = document.getElementById('moduleSuggestions');
 
-let allModulesCache = {};   // { [category]: string[] }
-let allModulesLoaded = false;
+let allPackagesCache = [];   // PackageInfo[]
+let allPackagesLoaded = false;
+let selectedPackage = null;  // the actual picked package object - there's no <select> to read .value from anymore
 
-function populateModuleSelect(category) {
-  moduleSelect.innerHTML = '<option value="" disabled selected>-- Select module --</option>';
-  (allModulesCache[category] || []).forEach(mod => {
-    const option = document.createElement('option');
-    option.value = mod;
-    option.textContent = mod;
-    moduleSelect.appendChild(option);
-  });
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
 }
 
 function hideSuggestions() {
@@ -1429,67 +1421,69 @@ function hideSuggestions() {
 
 function showSuggestions(results) {
   moduleSuggestions.innerHTML = '';
-  results.forEach(({ mod, cat }) => {
+  results.forEach(pkg => {
     const li = document.createElement('li');
-    li.className = 'suggestion-item';
-    li.textContent = `${mod} — ${cat}`;
-    li.addEventListener('mousedown', (e) => {
-      e.preventDefault(); // prevent input blur before click fires
-      // Set category dropdown
-      categorySelect.value = cat;
-      // Populate module dropdown from cache
-      populateModuleSelect(cat);
-      // Set module dropdown
-      moduleSelect.value = mod;
-      // Sync text input
-      moduleSearchInput.value = mod;
-      hideSuggestions();
-    });
+    const disabled = pkg.host !== 'github';
+    li.className = 'suggestion-item' + (disabled ? ' disabled' : '');
+    const name = pkg.prettyName || pkg.name;
+    const metaParts = [pkg.author, pkg.description].filter(Boolean);
+    li.innerHTML = `<div class="suggestion-name">${escapeHtml(name)}</div>` +
+      (metaParts.length ? `<div class="suggestion-meta">${escapeHtml(metaParts.join(' — '))}</div>` : '');
+    if (disabled) {
+      li.title = `Only GitHub-hosted packages can be auto-installed. Open it manually: ${pkg.url}`;
+    } else {
+      li.addEventListener('mousedown', (e) => {
+        e.preventDefault(); // prevent input blur before click fires
+        selectedPackage = pkg;
+        moduleSearchInput.value = name;
+        hideSuggestions();
+        updateButtonStates(document.getElementById('port').value);
+      });
+    }
     moduleSuggestions.appendChild(li);
   });
   moduleSuggestions.style.display = results.length ? 'block' : 'none';
 }
 
-// When category changes via dropdown, populate modules from cache or fetch
-categorySelect.addEventListener('change', () => {
-  const category = categorySelect.value;
-  moduleSearchInput.value = '';
-  hideSuggestions();
-  if (allModulesCache[category]) {
-    populateModuleSelect(category);
-  } else {
-    moduleSelect.innerHTML = '<option value="" disabled selected>Loading...</option>';
-    vscode.postMessage({ command: 'getModulesForCategory', category });
-  }
-});
+function packageMatches(pkg, query) {
+  const haystacks = [pkg.name, pkg.prettyName, pkg.description, pkg.author, ...(pkg.tags || [])];
+  return haystacks.some(h => h && h.toLowerCase().includes(query));
+}
 
-// When module changes via dropdown, sync text input
-moduleSelect.addEventListener('change', () => {
-  moduleSearchInput.value = moduleSelect.value;
-});
+function scorePackage(pkg, query) {
+  const name = (pkg.prettyName || pkg.name || '').toLowerCase();
+  if (name === query) return 3;
+  if (name.startsWith(query)) return 2;
+  if ((pkg.tags || []).some(t => t.toLowerCase() === query)) return 1.5;
+  if (name.includes(query)) return 1;
+  return 0;
+}
 
-// Live fuzzy search as user types
-moduleSearchInput.addEventListener('input', () => {
+function runPackageSearch() {
   const query = moduleSearchInput.value.trim().toLowerCase();
   hideSuggestions();
-  if (!query || !allModulesLoaded) return;
 
-  const results = [];
-  Object.entries(allModulesCache).forEach(([cat, mods]) => {
-    mods.forEach(mod => {
-      const ml = mod.toLowerCase();
-      if (ml.includes(query)) {
-        let score = 0;
-        if (ml === query) score = 2;
-        else if (ml.startsWith(query)) score = 1;
-        results.push({ mod, cat, score });
-      }
-    });
-  });
+  // Editing the text away from the selected package's name invalidates the
+  // selection, so the fetch buttons don't stay pointed at a stale pick.
+  if (selectedPackage && moduleSearchInput.value !== (selectedPackage.prettyName || selectedPackage.name)) {
+    selectedPackage = null;
+    updateButtonStates(document.getElementById('port').value);
+  }
 
-  results.sort((a, b) => b.score - a.score || a.mod.localeCompare(b.mod));
-  showSuggestions(results.slice(0, 10));
-});
+  if (!query || !allPackagesLoaded) return;
+
+  const results = allPackagesCache
+    .filter(pkg => packageMatches(pkg, query))
+    .map(pkg => ({ pkg, score: scorePackage(pkg, query) }))
+    .sort((a, b) => b.score - a.score || (a.pkg.prettyName || a.pkg.name).localeCompare(b.pkg.prettyName || b.pkg.name))
+    .slice(0, 15)
+    .map(r => r.pkg);
+
+  showSuggestions(results);
+}
+
+// Live search as user types
+moduleSearchInput.addEventListener('input', runPackageSearch);
 
 // Hide suggestions when input loses focus
 moduleSearchInput.addEventListener('blur', () => {
@@ -1497,10 +1491,9 @@ moduleSearchInput.addEventListener('blur', () => {
 });
 
 const fetchModule = (mode) => {
-  const sensor = moduleSelect?.value;
   const port = document.getElementById('port')?.value;
-  if (!sensor || !port) return;
-  vscode.postMessage({ command: 'fetchModule', sensor, port, mode });
+  if (!selectedPackage || !port) return;
+  vscode.postMessage({ command: 'fetchModule', packageId: selectedPackage.id, port, mode });
 };
 
 document.getElementById('fetchLibraryBtn')?.addEventListener('click', () => {
@@ -1518,57 +1511,36 @@ document.getElementById('fetchAllBtn')?.addEventListener('click', () => {
   fetchModule('all');
 });
 
-// Handle categories and modules from backend
+// Handle packages from backend
 window.addEventListener('message', event => {
   const message = event.data;
 
-  if (message.command === 'setCategories' && Array.isArray(message.categories)) {
-    categorySelect.innerHTML = '<option value="" disabled selected>-- Select category --</option>';
-    message.categories.forEach(cat => {
-      const option = document.createElement('option');
-      option.value = cat;
-      option.textContent = cat;
-      categorySelect.appendChild(option);
-    });
-  }
-
-  if (message.command === 'setModulesForCategory' && Array.isArray(message.modules)) {
-    moduleSelect.innerHTML = '<option value="" disabled selected>-- Select module --</option>';
-    message.modules.forEach(mod => {
-      const option = document.createElement('option');
-      option.value = mod;
-      option.textContent = mod;
-      moduleSelect.appendChild(option);
-    });
-    if (message.modules.length === 1) {
-      moduleSelect.value = message.modules[0];
-      moduleSearchInput.value = message.modules[0];
-    }
-  }
-
-  if (message.command === 'setAllModulesLoading') {
-    allModulesLoaded = false;
-    moduleSearchInput.placeholder = 'Loading modules...';
+  if (message.command === 'setPackagesLoading') {
+    allPackagesLoaded = false;
+    moduleSearchInput.placeholder = 'Loading packages...';
     moduleSearchInput.disabled = true;
     document.getElementById('modulesCacheStatus').style.display = 'none';
     document.getElementById('modulesLoadingStatus').style.display = 'block';
   }
 
-  if (message.command === 'setAllModules' && message.modules) {
-    allModulesCache = message.modules;
-    allModulesLoaded = true;
-    moduleSearchInput.placeholder = 'Type to search modules...';
+  if (message.command === 'setPackages' && Array.isArray(message.packages)) {
+    allPackagesCache = message.packages;
+    allPackagesLoaded = true;
+    moduleSearchInput.placeholder = 'Type to search packages...';
     const port = document.getElementById('port').value;
     moduleSearchInput.disabled = !port;
 
     document.getElementById('modulesLoadingStatus').style.display = 'none';
     const cacheStatus = document.getElementById('modulesCacheStatus');
     if (message.cachedAt) {
-      cacheStatus.textContent = 'Module list ' + formatCacheAge(message.cachedAt);
+      cacheStatus.textContent = 'Package list ' + formatCacheAge(message.cachedAt);
       cacheStatus.style.display = 'block';
     } else {
       cacheStatus.style.display = 'none';
     }
+
+    // Re-run the current search in case results changed (e.g. after a refresh)
+    if (moduleSearchInput.value.trim()) runPackageSearch();
   }
 });
 
