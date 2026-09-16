@@ -996,8 +996,12 @@ document.getElementById('flashFromWebBtn').addEventListener('click', () => {
   const firmwareUrl = document.getElementById('firmwareSelect').value;
   const port = document.getElementById('port').value;
 
+  // UF2 boards (RP2040/RP2350) show up as a mass-storage drive rather than a
+  // serial port, so only the esptool (.bin) path actually needs a port.
+  const needsPort = !firmwareUrl.endsWith('.uf2');
+
   // Validate inputs before proceeding
-  if (!firmwareUrl || !port) {
+  if (!firmwareUrl || (needsPort && !port)) {
     return;
   }
 
@@ -1054,6 +1058,8 @@ window.addEventListener('message', (event) => {
       });
       select.appendChild(group);
     });
+
+    updateFlashFromWebState(document.getElementById('port').value);
   }
 
   if (message.command === 'moduleFetchStatus') {
@@ -1303,13 +1309,44 @@ document.addEventListener('visibilitychange', () => {
 const PORT_DEPENDENT_BTNS = [
   'uploadAsIsBtn', 'uploadFromPcBtn', 'listFilesBtn',
   'runFileBtn', 'stopCodeBtn', 'serialMonitorBtn', 'openFileBtn', 'deleteFileBtn', 'deleteAllFilesBtn',
-  'flashFromWebBtn', 'flashLocalBtn', 'fetchLibraryBtn', 'fetchExamplesBtn', 'fetchAllBtn'
+  'flashLocalBtn', 'fetchLibraryBtn', 'fetchExamplesBtn', 'fetchAllBtn'
 ];
 
 // IDs of dropdowns/inputs that require a port
-const PORT_DEPENDENT_INPUTS = [
-  'firmwareSelect', 'categorySelect', 'moduleSelect'
-];
+const PORT_DEPENDENT_INPUTS = [];
+
+// UF2 boards (RP2040/RP2350) enumerate as a mass-storage drive, not a serial
+// port, so "Download + Flash from Web" and its board picker must stay usable
+// without a port selected whenever a .uf2 firmware is (or will be) chosen.
+function isUf2FirmwareSelected() {
+  const select = document.getElementById('firmwareSelect');
+  return !!select && select.value.endsWith('.uf2');
+}
+
+function updateFlashFromWebState(port) {
+  const noPort = !port || port.trim() === '';
+  const select = document.getElementById('firmwareSelect');
+  const btn = document.getElementById('flashFromWebBtn');
+  // Always enabled once the firmware list has loaded - port requirement
+  // depends on the currently selected firmware's flashing method.
+  if (select) select.disabled = select.options.length === 0;
+
+  // Grey out (but keep visible) any .bin firmware entry while no port is
+  // selected, since those need esptool talking to a real serial port - only
+  // .uf2 entries (mass-storage drive, no port) stay pickable.
+  if (select) {
+    Array.from(select.options).forEach(opt => {
+      if (!opt.value) return; // leave placeholders alone
+      opt.disabled = noPort && !opt.value.endsWith('.uf2');
+    });
+  }
+
+  if (btn) {
+    const needsPort = !isUf2FirmwareSelected();
+    btn.disabled = !select || !select.value || (needsPort && noPort);
+    btn.title = (needsPort && noPort) ? 'Select a port first' : btn.getAttribute('data-title') || '';
+  }
+}
 
 function updateButtonStates(port) {
   const noPort = !port || port.trim() === '';
@@ -1324,6 +1361,7 @@ function updateButtonStates(port) {
     const el = document.getElementById(id);
     if (el) el.disabled = noPort;
   });
+  updateFlashFromWebState(port);
   // Run / Open / Delete Selected also require a file to be selected in the tree
   const runBtn = document.getElementById('runFileBtn');
   if (runBtn) runBtn.disabled = noPort || !selectedFilePath;
