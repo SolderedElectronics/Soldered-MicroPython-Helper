@@ -46,7 +46,12 @@ print(json.dumps(tree('/')))
     ctx.postMessage({ command: 'displayFiles', files });
   } catch (err: any) {
     ctx.outputChannel.appendLine(`[WARN] Failed to list files: ${err.message}`);
-    vscode.window.showErrorMessage(`Failed to list files: ${err.message}`);
+    // "queue aborted" means another operation (e.g. a firmware flash) just
+    // intentionally claimed the port - not a real failure worth alarming
+    // the user about, so skip the popup for this one case.
+    if (err?.message !== 'queue aborted') {
+      vscode.window.showErrorMessage(`Failed to list files: ${err.message}`);
+    }
     ctx.postMessage({ command: 'displayFiles', files: [] });
   }
 }

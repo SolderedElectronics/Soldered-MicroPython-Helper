@@ -205,6 +205,14 @@ export async function withRetry<T>(
       return await fn();
     } catch (err: any) {
       lastError = err;
+      // "queue aborted" means something else (e.g. a firmware flash) just
+      // intentionally claimed the port out from under this call. Retrying
+      // here would only re-enqueue a new mpremote invocation that fights
+      // that operation for the same port - stop immediately instead of
+      // retrying through an abort that was deliberate.
+      if (err?.message === 'queue aborted') {
+        throw err;
+      }
       if (attempt < retries) {
         outputChannel?.appendLine(`[RETRY ${attempt}/${retries}] ${label}: ${err.message}`);
         await new Promise(r => setTimeout(r, delayMs));
