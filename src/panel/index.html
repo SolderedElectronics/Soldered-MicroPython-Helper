@@ -491,7 +491,7 @@
     </p>
 
     <ul style="list-style-type: disc; padding-left: 20px; margin-top: 1.2rem;">
-      <li><strong>Flash Firmware:</strong> The <em>Download + Flash from Web</em> option supports <code>ESP32_GENERIC</code> (via <code>esptool</code>, <code>.bin</code>) and <code>RP2040/RP2350</code> boards (via <code>.uf2</code> copy to the boot drive).</li>
+      <li><strong>Flash Firmware:</strong> The <em>Download + Flash from Web</em> option supports <code>ESP32_GENERIC</code> (via <code>esptool</code>, <code>.bin</code> - needs a COM port) and <code>RP2040/RP2350</code> boards (via <code>.uf2</code> copy to the boot drive - no COM port needed, since UF2 boards enumerate as a mass-storage drive instead).</li>
       <li><strong>Upload Python Scripts:</strong> Upload the currently open file or pick a file from your PC.</li>
       <li><strong>Manage Files:</strong> List, delete, run, or open files stored on the device. Double-click a file to open it in the editor.</li>
       <li><strong>Serial Monitor:</strong> View live output from the board over serial.</li>
